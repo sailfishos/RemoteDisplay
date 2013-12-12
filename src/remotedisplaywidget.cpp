@@ -1,9 +1,14 @@
 #include "remotedisplaywidget.h"
+#include "remotedisplaywidget_p.h"
+#include "eventprocessor.h"
 
 #include <freerdp/freerdp.h>
 #include <freerdp/utils/tcp.h>
+#include <freerdp/client/cmdline.h>
 
 #include <QDebug>
+#include <QThread>
+#include <QPointer>
 
 namespace {
 
@@ -15,94 +20,125 @@ struct MyContext
 
 }
 
-class RemoteDisplayWidgetPrivate {
-public:
-    RemoteDisplayWidgetPrivate() : freeRdpInstance(nullptr) {
+RemoteDisplayWidgetPrivate::RemoteDisplayWidgetPrivate(RemoteDisplayWidget *q)
+    : q_ptr(q), freeRdpInstance(nullptr) {
+    processorThread = new QThread(q);
+    processorThread->start();
+}
+
+void RemoteDisplayWidgetPrivate::initFreeRDP() {
+    Q_Q(RemoteDisplayWidget);
+
+    if (freeRdpInstance) {
+        return;
     }
+    freeRdpInstance = freerdp_new();
 
-    void initFreeRDP() {
-        if (freeRdpInstance) {
-            return;
-        }
-        freeRdpInstance = freerdp_new();
+    freeRdpInstance->ContextSize = sizeof(MyContext);
+    freeRdpInstance->ContextNew = nullptr;
+    freeRdpInstance->ContextFree = nullptr;
+    freeRdpInstance->PreConnect = PreConnectCallback;
+    freeRdpInstance->PostConnect = PostConnectCallback;
+    freeRdpInstance->Authenticate = nullptr;
+    freeRdpInstance->VerifyCertificate = nullptr;
+    freeRdpInstance->VerifyChangedCertificate = nullptr;
+    freeRdpInstance->LogonErrorInfo = nullptr;
+    freeRdpInstance->PostDisconnect = PostDisconnectCallback;
+    freeRdpInstance->SendChannelData = nullptr;
+    freeRdpInstance->ReceiveChannelData = nullptr;
 
-        freeRdpInstance->ContextSize = sizeof(MyContext);
-        freeRdpInstance->ContextNew = nullptr;
-        freeRdpInstance->ContextFree = nullptr;
-        freeRdpInstance->PreConnect = PreConnectCallback;
-        freeRdpInstance->PostConnect = PostConnectCallback;
-        freeRdpInstance->Authenticate = nullptr;
-        freeRdpInstance->VerifyCertificate = nullptr;
-        freeRdpInstance->VerifyChangedCertificate = nullptr;
-        freeRdpInstance->LogonErrorInfo = nullptr;
-        freeRdpInstance->PostDisconnect = PostDisconnectCallback;
-        freeRdpInstance->SendChannelData = nullptr;
-        freeRdpInstance->ReceiveChannelData = nullptr;
+    freerdp_context_new(freeRdpInstance);
+    getMyContext(freeRdpInstance)->pimpl = this;
 
-        freerdp_context_new(freeRdpInstance);
-        getMyContext(freeRdpInstance)->pimpl = this;
-    }
+    auto update = freeRdpInstance->update;
+    update->BeginPaint = BeginPaintCallback;
 
-    void setSettingServerHostName(const QString &host) {
-        auto hostData = host.toLocal8Bit();
-        auto settings = freeRdpInstance->context->settings;
-        free(settings->ServerHostname);
-        settings->ServerHostname = _strdup(hostData.data());
-    }
+    auto settings = freeRdpInstance->context->settings;
+    settings->EmbeddedWindow = TRUE;
+    qDebug() << "Window ID:" << q->winId();
+    settings->ParentWindowId = (UINT64)q->winId();
+}
 
-    void setSettingServerPort(quint16 port) {
-        auto settings = freeRdpInstance->context->settings;
-        settings->ServerPort = port;
-    }
+void RemoteDisplayWidgetPrivate::setSettingServerHostName(const QString &host) {
+    auto hostData = host.toLocal8Bit();
+    auto settings = freeRdpInstance->context->settings;
+    free(settings->ServerHostname);
+    settings->ServerHostname = _strdup(hostData.data());
+}
 
-    static MyContext* getMyContext(freerdp* instance) {
-        return reinterpret_cast<MyContext*>(instance->context);
-    }
+void RemoteDisplayWidgetPrivate::setSettingServerPort(quint16 port) {
+    auto settings = freeRdpInstance->context->settings;
+    settings->ServerPort = port;
+}
 
-    static BOOL PreConnectCallback(freerdp* instance) {
-        return getMyContext(instance)->pimpl->onConnect();
-    }
+MyContext* RemoteDisplayWidgetPrivate::getMyContext(freerdp* instance) {
+    return reinterpret_cast<MyContext*>(instance->context);
+}
 
-    static BOOL PostConnectCallback(freerdp* instance) {
-        return getMyContext(instance)->pimpl->onConnected();
-    }
+MyContext* RemoteDisplayWidgetPrivate::getMyContext(rdpContext* context) {
+    return reinterpret_cast<MyContext*>(context);
+}
 
-    static void PostDisconnectCallback(freerdp* instance) {
-        getMyContext(instance)->pimpl->onDisconnected();
-    }
+BOOL RemoteDisplayWidgetPrivate::PreConnectCallback(freerdp* instance) {
+    QMetaObject::invokeMethod(getMyContext(instance)->pimpl, "onAboutToConnect");
+    return TRUE;
+}
 
-    bool onConnect() {
-        qDebug() << "ON CONNECT";
-        return true;
-    }
+BOOL RemoteDisplayWidgetPrivate::PostConnectCallback(freerdp* instance) {
+    QMetaObject::invokeMethod(getMyContext(instance)->pimpl, "onConnected");
+    return TRUE;
+}
 
-    bool onConnected() {
-        qDebug() << "ON CONNECTED";
-        return true;
-    }
+void RemoteDisplayWidgetPrivate::PostDisconnectCallback(freerdp* instance) {
+    QMetaObject::invokeMethod(getMyContext(instance)->pimpl, "onDisconnected");
+}
 
-    void onDisconnected() {
-        qDebug() << "ON DISCONNECTED";
-    }
+void RemoteDisplayWidgetPrivate::BeginPaintCallback(rdpContext* context) {
+    QMetaObject::invokeMethod(getMyContext(context)->pimpl, "onBeginPaint");
+}
 
-    freerdp* freeRdpInstance;
-};
+void RemoteDisplayWidgetPrivate::onAboutToConnect() {
+    Q_ASSERT(thread() == QThread::currentThread());
+    qDebug() << "ON CONNECT";
+}
+
+void RemoteDisplayWidgetPrivate::onConnected() {
+    Q_ASSERT(thread() == QThread::currentThread());
+    qDebug() << "ON CONNECTED";
+}
+
+void RemoteDisplayWidgetPrivate::onDisconnected() {
+    Q_ASSERT(thread() == QThread::currentThread());
+    qDebug() << "ON DISCONNECTED";
+}
+
+void RemoteDisplayWidgetPrivate::onBeginPaint() {
+    Q_Q(RemoteDisplayWidget);
+    Q_ASSERT(thread() == QThread::currentThread());
+    q->update();
+}
 
 typedef RemoteDisplayWidgetPrivate Pimpl;
 
 RemoteDisplayWidget::RemoteDisplayWidget(QWidget *parent)
-    : QWidget(parent), d_ptr(new RemoteDisplayWidgetPrivate) {
+    : QWidget(parent), d_ptr(new RemoteDisplayWidgetPrivate(this)) {
     freerdp_wsa_startup();
 }
 
 RemoteDisplayWidget::~RemoteDisplayWidget() {
     Q_D(RemoteDisplayWidget);
+    if (d->eventProcessor) {
+        d->eventProcessor->requestStop();
+    }
+    d->processorThread->quit();
+    d->processorThread->wait();
+
     if (d->freeRdpInstance) {
-        freerdp_disconnect(d->freeRdpInstance);
         freerdp_context_free(d->freeRdpInstance);
         freerdp_free(d->freeRdpInstance);
         d->freeRdpInstance = nullptr;
     }
+
     freerdp_wsa_cleanup();
     delete d_ptr;
 }
@@ -116,9 +152,13 @@ void RemoteDisplayWidget::connectToHost(const QString &host, quint16 port) {
 
     qDebug() << "Connecting to" << host << ":" << port;
 
-    // TODO: find non-blocking alternative
-    if (!freerdp_connect(d->freeRdpInstance)) {
-        qDebug() << "Failed to connect";
-        return;
-    }
+    d->eventProcessor = new EventProcessor(d->freeRdpInstance);
+    d->eventProcessor->moveToThread(d->processorThread);
+    QMetaObject::invokeMethod(d->eventProcessor, "run");
+}
+
+void RemoteDisplayWidget::paintEvent(QPaintEvent *event) {
+    static int foo = 0;
+    qDebug() << "PAINT EVENT" << foo++;
+    QWidget::paintEvent(event);
 }

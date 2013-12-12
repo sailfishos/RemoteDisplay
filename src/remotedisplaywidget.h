@@ -14,6 +14,9 @@ public:
 
     void connectToHost(const QString &host, quint16 port);
 
+protected:
+    virtual void paintEvent(QPaintEvent *event);
+
 private:
     Q_DECLARE_PRIVATE(RemoteDisplayWidget)
     RemoteDisplayWidgetPrivate* const d_ptr;
