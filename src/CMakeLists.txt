@@ -16,4 +16,4 @@ list(APPEND SRC_LIST global.h remotedisplaywidget_p.h)
 
 add_library(${PROJECT_NAME} SHARED ${SRC_LIST})
 set_property(TARGET ${PROJECT_NAME} PROPERTY COMPILE_DEFINITIONS REMOTEDISPLAY_LIBRARY)
-target_link_libraries(${PROJECT_NAME} ${QT_LIBRARIES} freerdp-core)
+target_link_libraries(${PROJECT_NAME} ${QT_LIBRARIES} freerdp-core freerdp-codec)

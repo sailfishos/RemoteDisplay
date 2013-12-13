@@ -3,13 +3,24 @@
 
 #include <QWidget>
 #include <QPointer>
+#include <QQueue>
+#include <QMutex>
 #include <freerdp/freerdp.h>
 
 class RemoteDisplayWidget;
 class QThread;
 class EventProcessor;
-namespace { struct MyContext; }
+namespace {
 
+struct MyContext;
+
+struct ImageUpdate {
+    QRect rect;
+    QByteArray data;
+    QImage image;
+};
+
+}
 
 class RemoteDisplayWidgetPrivate : public QObject {
     Q_OBJECT
@@ -26,10 +37,13 @@ public:
     static BOOL PostConnectCallback(freerdp* instance);
     static void PostDisconnectCallback(freerdp* instance);
     static void BeginPaintCallback(rdpContext* context);
+    static void BitmapUpdateCallback(rdpContext* context, BITMAP_UPDATE* updates);
 
     freerdp* freeRdpInstance;
     QPointer<QThread> processorThread;
     QPointer<EventProcessor> eventProcessor;
+    QQueue<ImageUpdate> imageUpdates;
+    QMutex imageUpdateQueueMutex;
 
     Q_DECLARE_PUBLIC(RemoteDisplayWidget)
     RemoteDisplayWidget* const q_ptr;
