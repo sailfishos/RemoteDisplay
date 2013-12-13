@@ -11,6 +11,7 @@
 #include <QThread>
 #include <QPointer>
 #include <QPainter>
+#include <QPaintEvent>
 
 namespace {
 
@@ -87,6 +88,17 @@ void RemoteDisplayWidgetPrivate::setSettingServerPort(quint16 port) {
     settings->ServerPort = port;
 }
 
+void RemoteDisplayWidgetPrivate::resizeOffscreenBuffer() {
+    Q_Q(RemoteDisplayWidget);
+    QMutexLocker locker(&offScreenBufferMutex);
+    if (offScreenBuffer.isNull()) {
+        offScreenBuffer = QImage(q->size(), QImage::Format_RGB32);
+        offScreenBuffer.fill(0);
+    } else {
+        offScreenBuffer = offScreenBuffer.copy(q->rect());
+    }
+}
+
 MyContext* RemoteDisplayWidgetPrivate::getMyContext(freerdp* instance) {
     return reinterpret_cast<MyContext*>(instance->context);
 }
@@ -116,9 +128,8 @@ void RemoteDisplayWidgetPrivate::BeginPaintCallback(rdpContext* context) {
 void RemoteDisplayWidgetPrivate::BitmapUpdateCallback(rdpContext *context, BITMAP_UPDATE *updates) {
     auto self = getMyContext(context)->pimpl;
 
-    // this method is called from another thread so we need to protect
-    // access to the queue
-    QMutexLocker locker(&self->imageUpdateQueueMutex);
+    QMutexLocker locker(&self->offScreenBufferMutex);
+    QPainter painter(&self->offScreenBuffer);
 
     for (quint32 i = 0; i < updates->number; i++) {
         auto update = &updates->rectangles[i];
@@ -141,11 +152,9 @@ void RemoteDisplayWidgetPrivate::BitmapUpdateCallback(rdpContext *context, BITMA
             qWarning() << "Bitmap update decompression failed";
         }
 
-        ImageUpdate iUp;
-        iUp.rect = QRect(update->destLeft, update->destTop, w, h);
-        iUp.data = imgData;
-        iUp.image = QImage((uchar*)iUp.data.data(), w, h, bppToImageFormat(bpp));
-        self->imageUpdates.enqueue(iUp);
+        QRect rect(update->destLeft, update->destTop, w, h);
+        QImage image((uchar*)imgData.data(), w, h, bppToImageFormat(bpp));
+        painter.drawImage(rect, image);
     }
     QMetaObject::invokeMethod(self->q_func(), "update");
 }
@@ -175,8 +184,10 @@ typedef RemoteDisplayWidgetPrivate Pimpl;
 
 RemoteDisplayWidget::RemoteDisplayWidget(QWidget *parent)
     : QWidget(parent), d_ptr(new RemoteDisplayWidgetPrivate(this)) {
+    Q_D(RemoteDisplayWidget);
     setAttribute(Qt::WA_OpaquePaintEvent);
     setAttribute(Qt::WA_NoSystemBackground);
+    d->resizeOffscreenBuffer();
     freerdp_wsa_startup();
 }
 
@@ -214,11 +225,12 @@ void RemoteDisplayWidget::connectToHost(const QString &host, quint16 port) {
 
 void RemoteDisplayWidget::paintEvent(QPaintEvent *event) {
     Q_D(RemoteDisplayWidget);
-    QMutexLocker locker(&d->imageUpdateQueueMutex);
-
+    QMutexLocker locker(&d->offScreenBufferMutex);
     QPainter painter(this);
-    while (!d->imageUpdates.isEmpty()) {
-        auto iUp = d->imageUpdates.dequeue();
-        painter.drawImage(iUp.rect, iUp.image);
-    }
+    painter.drawImage(event->rect(), d->offScreenBuffer);
+}
+
+void RemoteDisplayWidget::resizeEvent(QResizeEvent *event) {
+    Q_D(RemoteDisplayWidget);
+    d->resizeOffscreenBuffer();
 }

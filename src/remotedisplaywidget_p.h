@@ -10,17 +10,7 @@
 class RemoteDisplayWidget;
 class QThread;
 class EventProcessor;
-namespace {
-
-struct MyContext;
-
-struct ImageUpdate {
-    QRect rect;
-    QByteArray data;
-    QImage image;
-};
-
-}
+namespace { struct MyContext; }
 
 class RemoteDisplayWidgetPrivate : public QObject {
     Q_OBJECT
@@ -31,6 +21,8 @@ public:
 
     void setSettingServerHostName(const QString &host);
     void setSettingServerPort(quint16 port);
+    void resizeOffscreenBuffer();
+
     static MyContext* getMyContext(freerdp* instance);
     static MyContext* getMyContext(rdpContext* context);
     static BOOL PreConnectCallback(freerdp* instance);
@@ -42,8 +34,8 @@ public:
     freerdp* freeRdpInstance;
     QPointer<QThread> processorThread;
     QPointer<EventProcessor> eventProcessor;
-    QQueue<ImageUpdate> imageUpdates;
-    QMutex imageUpdateQueueMutex;
+    QMutex offScreenBufferMutex;
+    QImage offScreenBuffer;
 
     Q_DECLARE_PUBLIC(RemoteDisplayWidget)
     RemoteDisplayWidget* const q_ptr;
