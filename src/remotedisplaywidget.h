@@ -12,7 +12,10 @@ public:
     RemoteDisplayWidget(QWidget *parent = 0);
     ~RemoteDisplayWidget();
 
+    void setDesktopSize(quint16 width, quint16 height);
     void connectToHost(const QString &host, quint16 port);
+
+    virtual QSize sizeHint() const;
 
 protected:
     virtual void paintEvent(QPaintEvent *event);

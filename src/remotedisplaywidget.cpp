@@ -209,8 +209,19 @@ RemoteDisplayWidget::~RemoteDisplayWidget() {
     delete d_ptr;
 }
 
+void RemoteDisplayWidget::setDesktopSize(quint16 width, quint16 height) {
+    Q_D(RemoteDisplayWidget);
+    Q_ASSERT(!d->eventProcessor);
+
+    d->initFreeRDP();
+    auto settings = d->freeRdpInstance->settings;
+    settings->DesktopWidth = width;
+    settings->DesktopHeight = height;
+}
+
 void RemoteDisplayWidget::connectToHost(const QString &host, quint16 port) {
     Q_D(RemoteDisplayWidget);
+    Q_ASSERT(!d->eventProcessor);
 
     d->initFreeRDP();
     d->setSettingServerHostName(host);
@@ -221,6 +232,15 @@ void RemoteDisplayWidget::connectToHost(const QString &host, quint16 port) {
     d->eventProcessor = new EventProcessor(d->freeRdpInstance);
     d->eventProcessor->moveToThread(d->processorThread);
     QMetaObject::invokeMethod(d->eventProcessor, "run");
+}
+
+QSize RemoteDisplayWidget::sizeHint() const {
+    Q_D(const RemoteDisplayWidget);
+    if (d->freeRdpInstance) {
+        auto settings = d->freeRdpInstance->settings;
+        return QSize(settings->DesktopWidth, settings->DesktopHeight);
+    }
+    return QWidget::sizeHint();
 }
 
 void RemoteDisplayWidget::paintEvent(QPaintEvent *event) {

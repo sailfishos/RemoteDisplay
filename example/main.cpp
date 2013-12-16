@@ -13,6 +13,7 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
+    w.setDesktopSize(540, 960);
     w.connectToHost(args.at(1), args.at(2).toInt());
     w.show();
 
