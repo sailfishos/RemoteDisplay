@@ -115,16 +115,6 @@ void EventProcessor::paintDesktopTo(QPaintDevice *device, const QRect &rect) {
 
 void EventProcessor::run() {
     stop = false;
-    int index;
-    int rcount;
-    int wcount;
-    void* rfds[32];
-    void* wfds[32];
-    int fds_count;
-    HANDLE fds[64];
-
-    memset(rfds, 0, sizeof(rfds));
-    memset(wfds, 0, sizeof(wfds));
 
     initFreeRDP();
 
@@ -134,40 +124,7 @@ void EventProcessor::run() {
     }
 
     while(!stop) {
-        rcount = 0;
-        wcount = 0;
-
-        if (!freerdp_get_fds(freeRdpInstance, rfds, &rcount, wfds, &wcount)) {
-            fprintf(stderr, "Failed to get FreeRDP file descriptor\n");
-            break;
-        }
-
-        fds_count = 0;
-        // setup read fds
-        for (index = 0; index < rcount; index++) {
-            fds[fds_count++] = rfds[index];
-        }
-        // setup write fds
-        for (index = 0; index < wcount; index++) {
-            fds[fds_count++] = wfds[index];
-        }
-        // exit if nothing to do
-        if (fds_count == 0) {
-            fprintf(stderr, "wfreerdp_run: fds_count is zero\n");
-            break;
-        }
-
-        // do the wait
-        if (MsgWaitForMultipleObjects(fds_count, fds, FALSE, 1000, QS_ALLINPUT) == WAIT_FAILED) {
-            fprintf(stderr, "wfreerdp_run: WaitForMultipleObjects failed: 0x%04X\n", GetLastError());
-            break;
-        }
-
-        if (!freerdp_check_fds(freeRdpInstance)) {
-            fprintf(stderr, "Failed to check FreeRDP file descriptor\n");
-            break;
-        }
-        if (freerdp_shall_disconnect(freeRdpInstance)) {
+        if (!handleFds()) {
             break;
         }
     }
@@ -203,6 +160,122 @@ void EventProcessor::initFreeRDP() {
     auto settings = freeRdpInstance->context->settings;
     settings->EmbeddedWindow = TRUE;
 }
+
+#ifdef Q_OS_WIN
+bool EventProcessor::handleFds() {
+    int rcount = 0;
+    int wcount = 0;
+    int index;
+    void* rfds[32];
+    void* wfds[32];
+    int fds_count;
+    HANDLE fds[64];
+
+    memset(rfds, 0, sizeof(rfds));
+    memset(wfds, 0, sizeof(wfds));
+
+    if (!freerdp_get_fds(freeRdpInstance, rfds, &rcount, wfds, &wcount)) {
+        fprintf(stderr, "Failed to get FreeRDP file descriptor\n");
+        return false;
+    }
+
+    fds_count = 0;
+    // setup read fds
+    for (index = 0; index < rcount; index++) {
+        fds[fds_count++] = rfds[index];
+    }
+    // setup write fds
+    for (index = 0; index < wcount; index++) {
+        fds[fds_count++] = wfds[index];
+    }
+    // exit if nothing to do
+    if (fds_count == 0) {
+        fprintf(stderr, "wfreerdp_run: fds_count is zero\n");
+        return false;
+    }
+
+    // do the wait
+    if (MsgWaitForMultipleObjects(fds_count, fds, FALSE, 1000, QS_ALLINPUT) == WAIT_FAILED) {
+        fprintf(stderr, "wfreerdp_run: WaitForMultipleObjects failed: 0x%04X\n", GetLastError());
+        return false;
+    }
+
+    if (!freerdp_check_fds(freeRdpInstance)) {
+        fprintf(stderr, "Failed to check FreeRDP file descriptor\n");
+        return false;
+    }
+    if (freerdp_shall_disconnect(freeRdpInstance)) {
+        return false;
+    }
+    return true;
+}
+#endif
+#ifdef Q_OS_UNIX
+bool EventProcessor::handleFds() {
+    int max_fds = 0;
+    int rcount = 0;
+    int wcount = 0;
+    void* rfds[32];
+    void* wfds[32];
+    timeval timeout;
+    fd_set rfds_set;
+    fd_set wfds_set;
+    int i;
+    int fds;
+
+    memset(rfds, 0, sizeof(rfds));
+    memset(wfds, 0, sizeof(wfds));
+
+    timeout.tv_sec = 1;
+    timeout.tv_usec = 0;
+
+    if (!freerdp_get_fds(freeRdpInstance, rfds, &rcount, wfds, &wcount)) {
+        fprintf(stderr, "Failed to get FreeRDP file descriptor\n");
+        return false;
+    }
+
+    max_fds = 0;
+    FD_ZERO(&rfds_set);
+    FD_ZERO(&wfds_set);
+
+    for (i = 0; i < rcount; i++) {
+        fds = (int)(long)(rfds[i]);
+
+        if (fds > max_fds) {
+            max_fds = fds;
+        }
+
+        FD_SET(fds, &rfds_set);
+    }
+
+    if (max_fds == 0) {
+        return false;
+    }
+
+    int select_status = select(max_fds + 1, &rfds_set, NULL, NULL, &timeout);
+
+    if (select_status == 0) {
+        return true;
+    } else if (select_status == -1) {
+        /* these are not really errors */
+        if (!((errno == EAGAIN) || (errno == EWOULDBLOCK) ||
+            (errno == EINPROGRESS) || (errno == EINTR))) /* signal occurred */
+        {
+            fprintf(stderr, "xfreerdp_run: select failed\n");
+            return false;
+        }
+    }
+
+    if (!freerdp_check_fds(freeRdpInstance)) {
+        fprintf(stderr, "Failed to check FreeRDP file descriptor\n");
+        return false;
+    }
+    if (freerdp_shall_disconnect(freeRdpInstance)) {
+        return false;
+    }
+    return true;
+}
+#endif
 
 void EventProcessor::setSettingServerHostName(const QString &host) {
     initFreeRDP();

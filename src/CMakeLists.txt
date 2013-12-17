@@ -3,6 +3,10 @@ cmake_minimum_required(VERSION 2.8)
 
 add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 
+if(CMAKE_COMPILER_IS_GNUCXX)
+    add_definitions("-std=gnu++0x")
+endif(CMAKE_COMPILER_IS_GNUCXX)
+
 set(CMAKE_AUTOMOC TRUE)
 find_package(Qt4 REQUIRED QtCore QtGui)
 find_package(WinPR)
