@@ -19,7 +19,6 @@ public:
 
 protected:
     virtual void paintEvent(QPaintEvent *event);
-    virtual void resizeEvent(QResizeEvent *event);
 
 private:
     Q_DECLARE_PRIVATE(RemoteDisplayWidget)
