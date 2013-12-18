@@ -1,6 +1,6 @@
 #include "remotedisplaywidget.h"
 #include "remotedisplaywidget_p.h"
-#include "eventprocessor.h"
+#include "freerdpclient.h"
 
 #include <QDebug>
 #include <QThread>
@@ -32,7 +32,8 @@ RemoteDisplayWidget::RemoteDisplayWidget(QWidget *parent)
     Q_D(RemoteDisplayWidget);
     setAttribute(Qt::WA_OpaquePaintEvent);
     setAttribute(Qt::WA_NoSystemBackground);
-    d->eventProcessor = new EventProcessor;
+    d->eventProcessor = new FreeRdpClient;
+    d->eventProcessor->moveToThread(d->processorThread);
 
     connect(d->eventProcessor, SIGNAL(aboutToConnect()), d, SLOT(onAboutToConnect()));
     connect(d->eventProcessor, SIGNAL(connected()), d, SLOT(onConnected()));
@@ -43,7 +44,7 @@ RemoteDisplayWidget::RemoteDisplayWidget(QWidget *parent)
 RemoteDisplayWidget::~RemoteDisplayWidget() {
     Q_D(RemoteDisplayWidget);
     if (d->eventProcessor) {
-        d->eventProcessor->requestStop();
+        QMetaObject::invokeMethod(d->eventProcessor, "requestStop");
     }
     d->processorThread->quit();
     d->processorThread->wait();
@@ -54,18 +55,19 @@ RemoteDisplayWidget::~RemoteDisplayWidget() {
 void RemoteDisplayWidget::setDesktopSize(quint16 width, quint16 height) {
     Q_D(RemoteDisplayWidget);
     d->desktopSize = QSize(width, height);
-    d->eventProcessor->setSettingDesktopSize(width, height);
+    QMetaObject::invokeMethod(d->eventProcessor, "setSettingDesktopSize",
+        Q_ARG(quint16, width), Q_ARG(quint16, height));
 }
 
 void RemoteDisplayWidget::connectToHost(const QString &host, quint16 port) {
     Q_D(RemoteDisplayWidget);
 
-    d->eventProcessor->setSettingServerHostName(host);
-    d->eventProcessor->setSettingServerPort(port);
+    QMetaObject::invokeMethod(d->eventProcessor, "setSettingServerHostName",
+        Q_ARG(QString, host));
+    QMetaObject::invokeMethod(d->eventProcessor, "setSettingServerPort",
+        Q_ARG(quint16, port));
 
     qDebug() << "Connecting to" << host << ":" << port;
-
-    d->eventProcessor->moveToThread(d->processorThread);
     QMetaObject::invokeMethod(d->eventProcessor, "run");
 }
 

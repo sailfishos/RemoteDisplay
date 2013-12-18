@@ -1,25 +1,28 @@
-#ifndef EVENTPROCESSOR_H
-#define EVENTPROCESSOR_H
+#ifndef FREERDPCLIENT_H
+#define FREERDPCLIENT_H
 
 #include <QWidget>
 #include <QMutex>
+#include <QPointer>
 #include <freerdp/freerdp.h>
 
-class EventProcessor : public QObject {
+class FreeRdpEventLoop;
+
+class FreeRdpClient : public QObject {
     Q_OBJECT
 public:
-    EventProcessor();
-    ~EventProcessor();
-
-    void requestStop();
+    FreeRdpClient();
+    ~FreeRdpClient();
 
     void paintDesktopTo(QPaintDevice *device, const QRect &rect);
+
+public slots:
     void setSettingServerHostName(const QString &host);
     void setSettingServerPort(quint16 port);
     void setSettingDesktopSize(quint16 width, quint16 height);
 
-public slots:
     void run();
+    void requestStop();
 
 signals:
     void aboutToConnect();
@@ -29,8 +32,6 @@ signals:
 
 private:
     void initFreeRDP();
-    bool handleFds();
-    bool waitFds(void **rfds, int rcount, void **wfds, int wcount);
 
     static void BitmapUpdateCallback(rdpContext *context, BITMAP_UPDATE *updates);
     static BOOL PreConnectCallback(freerdp* instance);
@@ -40,7 +41,7 @@ private:
     freerdp* freeRdpInstance;
     QMutex offScreenBufferMutex;
     QImage offScreenBuffer;
-    bool stop;
+    QPointer<FreeRdpEventLoop> loop;
 };
 
-#endif // EVENTPROCESSOR_H
+#endif // FREERDPCLIENT_H

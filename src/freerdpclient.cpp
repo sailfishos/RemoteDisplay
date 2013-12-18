@@ -1,4 +1,5 @@
-#include "eventprocessor.h"
+#include "freerdpclient.h"
+#include "freerdpeventloop.h"
 
 #include <freerdp/freerdp.h>
 #include <freerdp/utils/tcp.h>
@@ -12,7 +13,7 @@ namespace {
 struct MyContext
 {
     rdpContext freeRdpContext;
-    EventProcessor *self;
+    FreeRdpClient *self;
 };
 
 QImage::Format bppToImageFormat(int bpp) {
@@ -38,21 +39,21 @@ MyContext* getMyContext(freerdp* instance) {
 
 }
 
-BOOL EventProcessor::PreConnectCallback(freerdp* instance) {
+BOOL FreeRdpClient::PreConnectCallback(freerdp* instance) {
     emit getMyContext(instance)->self->aboutToConnect();
     return TRUE;
 }
 
-BOOL EventProcessor::PostConnectCallback(freerdp* instance) {
+BOOL FreeRdpClient::PostConnectCallback(freerdp* instance) {
     emit getMyContext(instance)->self->connected();
     return TRUE;
 }
 
-void EventProcessor::PostDisconnectCallback(freerdp* instance) {
+void FreeRdpClient::PostDisconnectCallback(freerdp* instance) {
     emit getMyContext(instance)->self->disconnected();
 }
 
-void EventProcessor::BitmapUpdateCallback(rdpContext *context, BITMAP_UPDATE *updates) {
+void FreeRdpClient::BitmapUpdateCallback(rdpContext *context, BITMAP_UPDATE *updates) {
     auto self = getMyContext(context)->self;
 
     QMutexLocker locker(&self->offScreenBufferMutex);
@@ -86,12 +87,13 @@ void EventProcessor::BitmapUpdateCallback(rdpContext *context, BITMAP_UPDATE *up
     emit self->desktopUpdated();
 }
 
-EventProcessor::EventProcessor()
+FreeRdpClient::FreeRdpClient()
     : freeRdpInstance(nullptr) {
     freerdp_wsa_startup();
+    loop = new FreeRdpEventLoop(this);
 }
 
-EventProcessor::~EventProcessor() {
+FreeRdpClient::~FreeRdpClient() {
     if (freeRdpInstance) {
         freerdp_context_free(freeRdpInstance);
         freerdp_free(freeRdpInstance);
@@ -100,11 +102,11 @@ EventProcessor::~EventProcessor() {
     freerdp_wsa_cleanup();
 }
 
-void EventProcessor::requestStop() {
-    stop = true;
+void FreeRdpClient::requestStop() {
+    loop->quit();
 }
 
-void EventProcessor::paintDesktopTo(QPaintDevice *device, const QRect &rect) {
+void FreeRdpClient::paintDesktopTo(QPaintDevice *device, const QRect &rect) {
     auto self = getMyContext(freeRdpInstance)->self;
     if (self) {
         QMutexLocker locker(&self->offScreenBufferMutex);
@@ -113,8 +115,7 @@ void EventProcessor::paintDesktopTo(QPaintDevice *device, const QRect &rect) {
     }
 }
 
-void EventProcessor::run() {
-    stop = false;
+void FreeRdpClient::run() {
 
     initFreeRDP();
 
@@ -123,16 +124,12 @@ void EventProcessor::run() {
         return;
     }
 
-    while(!stop) {
-        if (!handleFds()) {
-            break;
-        }
-    }
+    loop->exec(freeRdpInstance);
 
     freerdp_disconnect(freeRdpInstance);
 }
 
-void EventProcessor::initFreeRDP() {
+void FreeRdpClient::initFreeRDP() {
     if (freeRdpInstance) {
         return;
     }
@@ -161,121 +158,7 @@ void EventProcessor::initFreeRDP() {
     settings->EmbeddedWindow = TRUE;
 }
 
-bool EventProcessor::handleFds() {
-    int rcount = 0;
-    int wcount = 0;
-    void* rfds[32];
-    void* wfds[32];
-
-    memset(rfds, 0, sizeof(rfds));
-    memset(wfds, 0, sizeof(wfds));
-
-    if (!freerdp_get_fds(freeRdpInstance, rfds, &rcount, wfds, &wcount)) {
-        fprintf(stderr, "Failed to get FreeRDP file descriptor\n");
-        return false;
-    }
-
-    if (!waitFds(rfds, rcount, wfds, wcount)) {
-        return false;
-    }
-
-    if (!freerdp_check_fds(freeRdpInstance)) {
-        fprintf(stderr, "Failed to check FreeRDP file descriptor\n");
-        return false;
-    }
-
-    if (freerdp_shall_disconnect(freeRdpInstance)) {
-        return false;
-    }
-
-    return true;
-}
-
-#if defined(Q_OS_WIN)
-
-bool EventProcessor::waitFds(void** rfds, int rcount, void** wfds, int wcount) {
-    int index;
-    int fds_count = 0;
-    HANDLE fds[64];
-
-    // setup read fds
-    for (index = 0; index < rcount; index++) {
-        fds[fds_count++] = rfds[index];
-    }
-
-    // setup write fds
-    for (index = 0; index < wcount; index++) {
-        fds[fds_count++] = wfds[index];
-    }
-
-    // exit if nothing to do
-    if (fds_count == 0) {
-        fprintf(stderr, "wfreerdp_run: fds_count is zero\n");
-        return false;
-    }
-
-    // do the wait
-    if (MsgWaitForMultipleObjects(fds_count, fds, FALSE, 1000, QS_ALLINPUT) == WAIT_FAILED) {
-        fprintf(stderr, "wfreerdp_run: WaitForMultipleObjects failed: 0x%04X\n", GetLastError());
-        return false;
-    }
-
-    return true;
-}
-
-#elif defined(Q_OS_UNIX)
-
-bool EventProcessor::waitFds(void** rfds, int rcount, void** wfds, int wcount) {
-    int max_fds = 0;
-    timeval timeout;
-    fd_set rfds_set;
-    fd_set wfds_set;
-    int i;
-    int fds;
-
-    timeout.tv_sec = 1;
-    timeout.tv_usec = 0;
-
-    max_fds = 0;
-    FD_ZERO(&rfds_set);
-    FD_ZERO(&wfds_set);
-
-    for (i = 0; i < rcount; i++) {
-        fds = (int)(long)(rfds[i]);
-
-        if (fds > max_fds) {
-            max_fds = fds;
-        }
-
-        FD_SET(fds, &rfds_set);
-    }
-
-    if (max_fds == 0) {
-        return false;
-    }
-
-    int select_status = select(max_fds + 1, &rfds_set, NULL, NULL, &timeout);
-
-    if (select_status == 0) {
-        return true;
-    } else if (select_status == -1) {
-        /* these are not really errors */
-        if (!((errno == EAGAIN) || (errno == EWOULDBLOCK) ||
-            (errno == EINPROGRESS) || (errno == EINTR))) /* signal occurred */
-        {
-            fprintf(stderr, "xfreerdp_run: select failed\n");
-            return false;
-        }
-    }
-
-    return true;
-}
-
-#else
-#error Implementation missing for current platform!
-#endif
-
-void EventProcessor::setSettingServerHostName(const QString &host) {
+void FreeRdpClient::setSettingServerHostName(const QString &host) {
     initFreeRDP();
     auto hostData = host.toLocal8Bit();
     auto settings = freeRdpInstance->context->settings;
@@ -283,13 +166,13 @@ void EventProcessor::setSettingServerHostName(const QString &host) {
     settings->ServerHostname = _strdup(hostData.data());
 }
 
-void EventProcessor::setSettingServerPort(quint16 port) {
+void FreeRdpClient::setSettingServerPort(quint16 port) {
     initFreeRDP();
     auto settings = freeRdpInstance->context->settings;
     settings->ServerPort = port;
 }
 
-void EventProcessor::setSettingDesktopSize(quint16 width, quint16 height) {
+void FreeRdpClient::setSettingDesktopSize(quint16 width, quint16 height) {
     initFreeRDP();
     auto settings = freeRdpInstance->settings;
     settings->DesktopWidth = width;
