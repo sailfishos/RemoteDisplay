@@ -9,7 +9,6 @@
 class RemoteDisplayWidget;
 class QThread;
 class EventProcessor;
-namespace { struct MyContext; }
 
 class RemoteDisplayWidgetPrivate : public QObject {
     Q_OBJECT

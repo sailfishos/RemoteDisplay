@@ -30,6 +30,7 @@ signals:
 private:
     void initFreeRDP();
     bool handleFds();
+    bool waitFds(void **rfds, int rcount, void **wfds, int wcount);
 
     static void BitmapUpdateCallback(rdpContext *context, BITMAP_UPDATE *updates);
     static BOOL PreConnectCallback(freerdp* instance);

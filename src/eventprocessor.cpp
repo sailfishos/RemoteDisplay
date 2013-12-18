@@ -161,15 +161,11 @@ void EventProcessor::initFreeRDP() {
     settings->EmbeddedWindow = TRUE;
 }
 
-#ifdef Q_OS_WIN
 bool EventProcessor::handleFds() {
     int rcount = 0;
     int wcount = 0;
-    int index;
     void* rfds[32];
     void* wfds[32];
-    int fds_count;
-    HANDLE fds[64];
 
     memset(rfds, 0, sizeof(rfds));
     memset(wfds, 0, sizeof(wfds));
@@ -179,15 +175,39 @@ bool EventProcessor::handleFds() {
         return false;
     }
 
-    fds_count = 0;
+    if (!waitFds(rfds, rcount, wfds, wcount)) {
+        return false;
+    }
+
+    if (!freerdp_check_fds(freeRdpInstance)) {
+        fprintf(stderr, "Failed to check FreeRDP file descriptor\n");
+        return false;
+    }
+
+    if (freerdp_shall_disconnect(freeRdpInstance)) {
+        return false;
+    }
+
+    return true;
+}
+
+#if defined(Q_OS_WIN)
+
+bool EventProcessor::waitFds(void** rfds, int rcount, void** wfds, int wcount) {
+    int index;
+    int fds_count = 0;
+    HANDLE fds[64];
+
     // setup read fds
     for (index = 0; index < rcount; index++) {
         fds[fds_count++] = rfds[index];
     }
+
     // setup write fds
     for (index = 0; index < wcount; index++) {
         fds[fds_count++] = wfds[index];
     }
+
     // exit if nothing to do
     if (fds_count == 0) {
         fprintf(stderr, "wfreerdp_run: fds_count is zero\n");
@@ -200,39 +220,21 @@ bool EventProcessor::handleFds() {
         return false;
     }
 
-    if (!freerdp_check_fds(freeRdpInstance)) {
-        fprintf(stderr, "Failed to check FreeRDP file descriptor\n");
-        return false;
-    }
-    if (freerdp_shall_disconnect(freeRdpInstance)) {
-        return false;
-    }
     return true;
 }
-#endif
-#ifdef Q_OS_UNIX
-bool EventProcessor::handleFds() {
+
+#elif defined(Q_OS_UNIX)
+
+bool EventProcessor::waitFds(void** rfds, int rcount, void** wfds, int wcount) {
     int max_fds = 0;
-    int rcount = 0;
-    int wcount = 0;
-    void* rfds[32];
-    void* wfds[32];
     timeval timeout;
     fd_set rfds_set;
     fd_set wfds_set;
     int i;
     int fds;
 
-    memset(rfds, 0, sizeof(rfds));
-    memset(wfds, 0, sizeof(wfds));
-
     timeout.tv_sec = 1;
     timeout.tv_usec = 0;
-
-    if (!freerdp_get_fds(freeRdpInstance, rfds, &rcount, wfds, &wcount)) {
-        fprintf(stderr, "Failed to get FreeRDP file descriptor\n");
-        return false;
-    }
 
     max_fds = 0;
     FD_ZERO(&rfds_set);
@@ -266,15 +268,11 @@ bool EventProcessor::handleFds() {
         }
     }
 
-    if (!freerdp_check_fds(freeRdpInstance)) {
-        fprintf(stderr, "Failed to check FreeRDP file descriptor\n");
-        return false;
-    }
-    if (freerdp_shall_disconnect(freeRdpInstance)) {
-        return false;
-    }
     return true;
 }
+
+#else
+#error Implementation missing for current platform!
 #endif
 
 void EventProcessor::setSettingServerHostName(const QString &host) {
