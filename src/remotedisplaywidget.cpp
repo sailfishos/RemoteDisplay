@@ -30,8 +30,12 @@ typedef RemoteDisplayWidgetPrivate Pimpl;
 RemoteDisplayWidget::RemoteDisplayWidget(QWidget *parent)
     : QWidget(parent), d_ptr(new RemoteDisplayWidgetPrivate(this)) {
     Q_D(RemoteDisplayWidget);
+    qRegisterMetaType<Qt::MouseButton>("Qt::MouseButton");
+
     setAttribute(Qt::WA_OpaquePaintEvent);
     setAttribute(Qt::WA_NoSystemBackground);
+    setMouseTracking(true);
+
     d->eventProcessor = new FreeRdpClient;
     d->eventProcessor->moveToThread(d->processorThread);
 
@@ -83,3 +87,22 @@ void RemoteDisplayWidget::paintEvent(QPaintEvent *event) {
     Q_D(RemoteDisplayWidget);
     d->eventProcessor->paintDesktopTo(this, event->rect());
 }
+
+void RemoteDisplayWidget::mouseMoveEvent(QMouseEvent *event) {
+    Q_D(RemoteDisplayWidget);
+    QMetaObject::invokeMethod(d->eventProcessor, "sendMouseMoveEvent",
+        Q_ARG(int, event->x()), Q_ARG(int, event->y()));
+}
+
+void RemoteDisplayWidget::mousePressEvent(QMouseEvent *event) {
+    Q_D(RemoteDisplayWidget);
+    QMetaObject::invokeMethod(d->eventProcessor, "sendMousePressEvent",
+        Q_ARG(Qt::MouseButton, event->button()), Q_ARG(int, event->x()), Q_ARG(int, event->y()));
+}
+
+void RemoteDisplayWidget::mouseReleaseEvent(QMouseEvent *event) {
+    Q_D(RemoteDisplayWidget);
+    QMetaObject::invokeMethod(d->eventProcessor, "sendMouseReleaseEvent",
+        Q_ARG(Qt::MouseButton, event->button()), Q_ARG(int, event->x()), Q_ARG(int, event->y()));
+}
+

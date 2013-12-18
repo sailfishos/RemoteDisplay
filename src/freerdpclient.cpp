@@ -2,6 +2,7 @@
 #include "freerdpeventloop.h"
 
 #include <freerdp/freerdp.h>
+#include <freerdp/input.h>
 #include <freerdp/utils/tcp.h>
 #include <freerdp/codec/bitmap.h>
 
@@ -35,6 +36,15 @@ MyContext* getMyContext(rdpContext* context) {
 
 MyContext* getMyContext(freerdp* instance) {
     return getMyContext(instance->context);
+}
+
+UINT16 qtMouseButtonToRdpButton(Qt::MouseButton button) {
+    if (button == Qt::LeftButton) {
+        return PTR_FLAGS_BUTTON1;
+    } else if (button == Qt::RightButton) {
+        return PTR_FLAGS_BUTTON2;
+    }
+    return 0;
 }
 
 }
@@ -106,6 +116,26 @@ void FreeRdpClient::requestStop() {
     loop->quit();
 }
 
+void FreeRdpClient::sendMouseMoveEvent(int x, int y) {
+    sendMouseEvent(PTR_FLAGS_MOVE, x, y);
+}
+
+void FreeRdpClient::sendMousePressEvent(Qt::MouseButton button, int x, int y) {
+    auto rdpButton = qtMouseButtonToRdpButton(button);
+    if (!rdpButton) {
+        return;
+    }
+    sendMouseEvent(rdpButton | PTR_FLAGS_DOWN, x, y);
+}
+
+void FreeRdpClient::sendMouseReleaseEvent(Qt::MouseButton button, int x, int y) {
+    auto rdpButton = qtMouseButtonToRdpButton(button);
+    if (!rdpButton) {
+        return;
+    }
+    sendMouseEvent(rdpButton, x, y);
+}
+
 void FreeRdpClient::paintDesktopTo(QPaintDevice *device, const QRect &rect) {
     auto self = getMyContext(freeRdpInstance)->self;
     if (self) {
@@ -156,6 +186,14 @@ void FreeRdpClient::initFreeRDP() {
 
     auto settings = freeRdpInstance->context->settings;
     settings->EmbeddedWindow = TRUE;
+}
+
+void FreeRdpClient::sendMouseEvent(UINT16 flags, int x, int y) {
+    if (!freeRdpInstance) {
+        return;
+    }
+    auto input = freeRdpInstance->input;
+    input->MouseEvent(input, flags, x, y);
 }
 
 void FreeRdpClient::setSettingServerHostName(const QString &host) {

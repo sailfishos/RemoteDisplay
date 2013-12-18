@@ -24,6 +24,10 @@ public slots:
     void run();
     void requestStop();
 
+    void sendMouseMoveEvent(int x, int y);
+    void sendMousePressEvent(Qt::MouseButton button, int x, int y);
+    void sendMouseReleaseEvent(Qt::MouseButton button, int x, int y);
+
 signals:
     void aboutToConnect();
     void connected();
@@ -32,6 +36,7 @@ signals:
 
 private:
     void initFreeRDP();
+    void sendMouseEvent(UINT16 flags, int x, int y);
 
     static void BitmapUpdateCallback(rdpContext *context, BITMAP_UPDATE *updates);
     static BOOL PreConnectCallback(freerdp* instance);
