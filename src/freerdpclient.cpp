@@ -179,11 +179,14 @@ void FreeRdpClient::initFreeRDP() {
 }
 
 void FreeRdpClient::sendMouseEvent(UINT16 flags, int x, int y) {
-    if (!freeRdpInstance) {
-        return;
+    // note that this method is called from another thread, so lots of checking
+    // is needed, perhaps we would need a mutex as well?
+    if (freeRdpInstance) {
+        auto input = freeRdpInstance->input;
+        if (input && input->MouseEvent) {
+            input->MouseEvent(input, flags, x, y);
+        }
     }
-    auto input = freeRdpInstance->input;
-    input->MouseEvent(input, flags, x, y);
 }
 
 void FreeRdpClient::setSettingServerHostName(const QString &host) {

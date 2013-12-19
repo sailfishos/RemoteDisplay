@@ -97,19 +97,15 @@ void RemoteDisplayWidget::paintEvent(QPaintEvent *event) {
 
 void RemoteDisplayWidget::mouseMoveEvent(QMouseEvent *event) {
     Q_D(RemoteDisplayWidget);
-    QMetaObject::invokeMethod(d->eventProcessor, "sendMouseMoveEvent",
-        Q_ARG(int, event->x()), Q_ARG(int, event->y()));
+    d->eventProcessor->sendMouseMoveEvent(event->x(), event->y());
 }
 
 void RemoteDisplayWidget::mousePressEvent(QMouseEvent *event) {
     Q_D(RemoteDisplayWidget);
-    QMetaObject::invokeMethod(d->eventProcessor, "sendMousePressEvent",
-        Q_ARG(Qt::MouseButton, event->button()), Q_ARG(int, event->x()), Q_ARG(int, event->y()));
+    d->eventProcessor->sendMousePressEvent(event->button(), event->x(), event->y());
 }
 
 void RemoteDisplayWidget::mouseReleaseEvent(QMouseEvent *event) {
     Q_D(RemoteDisplayWidget);
-    QMetaObject::invokeMethod(d->eventProcessor, "sendMouseReleaseEvent",
-        Q_ARG(Qt::MouseButton, event->button()), Q_ARG(int, event->x()), Q_ARG(int, event->y()));
+    d->eventProcessor->sendMouseReleaseEvent(event->button(), event->x(), event->y());
 }
-

@@ -17,6 +17,10 @@ public:
 
     void paintDesktopTo(QPaintDevice *device, const QRect &rect);
 
+    void sendMouseMoveEvent(int x, int y);
+    void sendMousePressEvent(Qt::MouseButton button, int x, int y);
+    void sendMouseReleaseEvent(Qt::MouseButton button, int x, int y);
+
 public slots:
     void setSettingServerHostName(const QString &host);
     void setSettingServerPort(quint16 port);
@@ -24,10 +28,6 @@ public slots:
 
     void run();
     void requestStop();
-
-    void sendMouseMoveEvent(int x, int y);
-    void sendMousePressEvent(Qt::MouseButton button, int x, int y);
-    void sendMouseReleaseEvent(Qt::MouseButton button, int x, int y);
 
 signals:
     void aboutToConnect();
