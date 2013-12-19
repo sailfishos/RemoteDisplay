@@ -1,42 +1,18 @@
 #include "freerdpclient.h"
 #include "freerdpeventloop.h"
+#include "cursorchangenotifier.h"
+#include "freerdphelpers.h"
 
 #include <freerdp/freerdp.h>
 #include <freerdp/input.h>
 #include <freerdp/utils/tcp.h>
 #include <freerdp/codec/bitmap.h>
+#include <freerdp/cache/pointer.h>
 
 #include <QDebug>
 #include <QPainter>
 
 namespace {
-
-struct MyContext
-{
-    rdpContext freeRdpContext;
-    FreeRdpClient *self;
-};
-
-QImage::Format bppToImageFormat(int bpp) {
-    switch (bpp) {
-    case 16:
-        return QImage::Format_RGB16;
-    case 24:
-        return QImage::Format_RGB888;
-    case 32:
-        return QImage::Format_RGB32;
-    }
-    qWarning() << "Cannot handle" << bpp << "bits per pixel!";
-    return QImage::Format_Invalid;
-}
-
-MyContext* getMyContext(rdpContext* context) {
-    return reinterpret_cast<MyContext*>(context);
-}
-
-MyContext* getMyContext(freerdp* instance) {
-    return getMyContext(instance->context);
-}
 
 UINT16 qtMouseButtonToRdpButton(Qt::MouseButton button) {
     if (button == Qt::LeftButton) {
@@ -55,7 +31,14 @@ BOOL FreeRdpClient::PreConnectCallback(freerdp* instance) {
 }
 
 BOOL FreeRdpClient::PostConnectCallback(freerdp* instance) {
-    emit getMyContext(instance)->self->connected();
+    auto context = getMyContext(instance);
+    auto self = context->self;
+    emit self->connected();
+    pointer_cache_register_callbacks(instance->update);
+
+    auto notifier = new CursorChangeNotifier(context, self);
+    connect(notifier, SIGNAL(cursorChanged(Cursor)), self, SIGNAL(cursorChanged(Cursor)));
+
     return TRUE;
 }
 
@@ -149,6 +132,9 @@ void FreeRdpClient::run() {
 
     initFreeRDP();
 
+    auto context = freeRdpInstance->context;
+    context->cache = cache_new(freeRdpInstance->settings);
+
     if (!freerdp_connect(freeRdpInstance)) {
         qDebug() << "Failed to connect";
         return;
@@ -157,6 +143,10 @@ void FreeRdpClient::run() {
     loop->exec(freeRdpInstance);
 
     freerdp_disconnect(freeRdpInstance);
+
+    if (context->cache) {
+        cache_free(context->cache);
+    }
 }
 
 void FreeRdpClient::initFreeRDP() {

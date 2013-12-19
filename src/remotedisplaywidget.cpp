@@ -1,6 +1,7 @@
 #include "remotedisplaywidget.h"
 #include "remotedisplaywidget_p.h"
 #include "freerdpclient.h"
+#include "cursorchangenotifier.h"
 
 #include <QDebug>
 #include <QThread>
@@ -25,6 +26,11 @@ void RemoteDisplayWidgetPrivate::onDisconnected() {
     qDebug() << "ON DISCONNECTED";
 }
 
+void RemoteDisplayWidgetPrivate::onCursorChanged(const Cursor &cursor) {
+    Q_Q(RemoteDisplayWidget);
+    q->setCursor(cursor);
+}
+
 typedef RemoteDisplayWidgetPrivate Pimpl;
 
 RemoteDisplayWidget::RemoteDisplayWidget(QWidget *parent)
@@ -43,6 +49,7 @@ RemoteDisplayWidget::RemoteDisplayWidget(QWidget *parent)
     connect(d->eventProcessor, SIGNAL(connected()), d, SLOT(onConnected()));
     connect(d->eventProcessor, SIGNAL(disconnected()), d, SLOT(onDisconnected()));
     connect(d->eventProcessor, SIGNAL(desktopUpdated()), this, SLOT(update()));
+    connect(d->eventProcessor, SIGNAL(cursorChanged(Cursor)), d, SLOT(onCursorChanged(Cursor)));
 }
 
 RemoteDisplayWidget::~RemoteDisplayWidget() {

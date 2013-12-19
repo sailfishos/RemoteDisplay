@@ -7,6 +7,7 @@
 #include <freerdp/freerdp.h>
 
 class FreeRdpEventLoop;
+class Cursor;
 
 class FreeRdpClient : public QObject {
     Q_OBJECT
@@ -33,6 +34,7 @@ signals:
     void connected();
     void disconnected();
     void desktopUpdated();
+    void cursorChanged(const Cursor &cursor);
 
 private:
     void initFreeRDP();

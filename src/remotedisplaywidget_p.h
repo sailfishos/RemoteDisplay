@@ -9,6 +9,7 @@
 class RemoteDisplayWidget;
 class QThread;
 class FreeRdpClient;
+class Cursor;
 
 class RemoteDisplayWidgetPrivate : public QObject {
     Q_OBJECT
@@ -26,6 +27,7 @@ private slots:
     void onAboutToConnect();
     void onConnected();
     void onDisconnected();
+    void onCursorChanged(const Cursor &cursor);
 };
 
 #endif // REMOTEDISPLAYWIDGET_P_H

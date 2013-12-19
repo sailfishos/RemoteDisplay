@@ -16,8 +16,8 @@ include(${QT_USE_FILE})
 include_directories(${FreeRDP_INCLUDE_DIR} ${WinPR_INCLUDE_DIR})
 
 aux_source_directory(. SRC_LIST)
-list(APPEND SRC_LIST global.h remotedisplaywidget_p.h)
+list(APPEND SRC_LIST global.h remotedisplaywidget_p.h freerdphelpers.h)
 
 add_library(${PROJECT_NAME} SHARED ${SRC_LIST})
 set_property(TARGET ${PROJECT_NAME} PROPERTY COMPILE_DEFINITIONS REMOTEDISPLAY_LIBRARY)
-target_link_libraries(${PROJECT_NAME} ${QT_LIBRARIES} freerdp-core freerdp-codec)
+target_link_libraries(${PROJECT_NAME} ${QT_LIBRARIES} freerdp-core freerdp-codec freerdp-cache)
