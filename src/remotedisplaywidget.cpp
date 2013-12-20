@@ -10,8 +10,6 @@
 
 RemoteDisplayWidgetPrivate::RemoteDisplayWidgetPrivate(RemoteDisplayWidget *q)
     : q_ptr(q) {
-    processorThread = new QThread(q);
-    processorThread->start();
 }
 
 void RemoteDisplayWidgetPrivate::onAboutToConnect() {
@@ -43,7 +41,6 @@ RemoteDisplayWidget::RemoteDisplayWidget(QWidget *parent)
     setMouseTracking(true);
 
     d->eventProcessor = new FreeRdpClient;
-    d->eventProcessor->moveToThread(d->processorThread);
 
     connect(d->eventProcessor, SIGNAL(aboutToConnect()), d, SLOT(onAboutToConnect()));
     connect(d->eventProcessor, SIGNAL(connected()), d, SLOT(onConnected()));
@@ -55,10 +52,8 @@ RemoteDisplayWidget::RemoteDisplayWidget(QWidget *parent)
 RemoteDisplayWidget::~RemoteDisplayWidget() {
     Q_D(RemoteDisplayWidget);
     if (d->eventProcessor) {
-        QMetaObject::invokeMethod(d->eventProcessor, "requestStop");
+        d->eventProcessor->requestStop();
     }
-    d->processorThread->quit();
-    d->processorThread->wait();
 
     delete d_ptr;
 }
@@ -66,20 +61,17 @@ RemoteDisplayWidget::~RemoteDisplayWidget() {
 void RemoteDisplayWidget::setDesktopSize(quint16 width, quint16 height) {
     Q_D(RemoteDisplayWidget);
     d->desktopSize = QSize(width, height);
-    QMetaObject::invokeMethod(d->eventProcessor, "setSettingDesktopSize",
-        Q_ARG(quint16, width), Q_ARG(quint16, height));
+    d->eventProcessor->setSettingDesktopSize(width, height);
 }
 
 void RemoteDisplayWidget::connectToHost(const QString &host, quint16 port) {
     Q_D(RemoteDisplayWidget);
 
-    QMetaObject::invokeMethod(d->eventProcessor, "setSettingServerHostName",
-        Q_ARG(QString, host));
-    QMetaObject::invokeMethod(d->eventProcessor, "setSettingServerPort",
-        Q_ARG(quint16, port));
+    d->eventProcessor->setSettingServerHostName(host);
+    d->eventProcessor->setSettingServerPort(port);
 
     qDebug() << "Connecting to" << host << ":" << port;
-    QMetaObject::invokeMethod(d->eventProcessor, "run");
+    d->eventProcessor->run();
 }
 
 QSize RemoteDisplayWidget::sizeHint() const {

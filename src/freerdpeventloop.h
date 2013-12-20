@@ -1,22 +1,41 @@
 #ifndef FREERDPEVENTLOOP_H
 #define FREERDPEVENTLOOP_H
 
-#include <QObject>
+#include <QThread>
+#include <QPointer>
 #include <freerdp/freerdp.h>
+
+class FreeRdpFdsListenerThread;
 
 class FreeRdpEventLoop : public QObject {
     Q_OBJECT
 public:
     FreeRdpEventLoop(QObject *parent = 0);
+    ~FreeRdpEventLoop();
 
-    void exec(freerdp* instance);
-    void quit();
+    void listen(freerdp* instance);
+    void stopListen();
+
+signals:
+    void eventReceived();
 
 private:
-    bool handleFds();
-    bool waitFds(void **rfds, int rcount, void **wfds, int wcount);
+    QPointer<FreeRdpFdsListenerThread> thread;
+};
 
-    freerdp* freeRdpInstance;
+// TODO: move to private header file
+class FreeRdpFdsListenerThread : public QThread {
+    Q_OBJECT
+public:
+    virtual void run();
+    bool handleFds();
+    bool waitFds(void** rfds, int rcount, void** wfds, int wcount);
+
+signals:
+    void eventReceived();
+
+public:
+    freerdp *freeRdpInstance;
     bool shouldQuit;
 };
 

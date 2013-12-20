@@ -28,6 +28,7 @@ public slots:
 
     void run();
     void requestStop();
+    void disconnectFromHost();
 
 signals:
     void aboutToConnect();
@@ -35,6 +36,10 @@ signals:
     void disconnected();
     void desktopUpdated();
     void cursorChanged(const Cursor &cursor);
+
+private slots:
+    void onError();
+    void onRdpEventReceived();
 
 private:
     void initFreeRDP();

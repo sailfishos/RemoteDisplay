@@ -1,27 +1,13 @@
 #include "freerdpeventloop.h"
 #include <QCoreApplication>
+#include <QThread>
+#include <QDebug>
 
-FreeRdpEventLoop::FreeRdpEventLoop(QObject *parent) :
-    QObject(parent), freeRdpInstance(nullptr) {
+void FreeRdpFdsListenerThread::run() {
+    while(!shouldQuit && handleFds());
 }
 
-void FreeRdpEventLoop::exec(freerdp *instance) {
-    freeRdpInstance = instance;
-    shouldQuit = false;
-
-    while(!shouldQuit) {
-        if (!handleFds()) {
-            break;
-        }
-        QCoreApplication::processEvents();
-    }
-}
-
-void FreeRdpEventLoop::quit() {
-    shouldQuit = true;
-}
-
-bool FreeRdpEventLoop::handleFds() {
+bool FreeRdpFdsListenerThread::handleFds() {
     int rcount = 0;
     int wcount = 0;
     void* rfds[32];
@@ -31,20 +17,11 @@ bool FreeRdpEventLoop::handleFds() {
     memset(wfds, 0, sizeof(wfds));
 
     if (!freerdp_get_fds(freeRdpInstance, rfds, &rcount, wfds, &wcount)) {
-        fprintf(stderr, "Failed to get FreeRDP file descriptor\n");
+        qWarning() << "Failed to get FreeRDP file descriptor";
         return false;
     }
 
     if (!waitFds(rfds, rcount, wfds, wcount)) {
-        return false;
-    }
-
-    if (!freerdp_check_fds(freeRdpInstance)) {
-        fprintf(stderr, "Failed to check FreeRDP file descriptor\n");
-        return false;
-    }
-
-    if (freerdp_shall_disconnect(freeRdpInstance)) {
         return false;
     }
 
@@ -53,7 +30,7 @@ bool FreeRdpEventLoop::handleFds() {
 
 #if defined(Q_OS_WIN)
 
-bool FreeRdpEventLoop::waitFds(void** rfds, int rcount, void** wfds, int wcount) {
+bool FreeRdpFdsListenerThread::waitFds(void** rfds, int rcount, void** wfds, int wcount) {
     int index;
     int fds_count = 0;
     HANDLE fds[64];
@@ -70,14 +47,18 @@ bool FreeRdpEventLoop::waitFds(void** rfds, int rcount, void** wfds, int wcount)
 
     // exit if nothing to do
     if (fds_count == 0) {
-        fprintf(stderr, "wfreerdp_run: fds_count is zero\n");
+        qWarning() << "fds_count is zero";
         return false;
     }
 
     // do the wait
-    if (MsgWaitForMultipleObjects(fds_count, fds, FALSE, 1000, QS_ALLINPUT) == WAIT_FAILED) {
-        fprintf(stderr, "wfreerdp_run: WaitForMultipleObjects failed: 0x%04X\n", GetLastError());
+    auto status = MsgWaitForMultipleObjects(fds_count, fds, FALSE, 1000, QS_ALLINPUT);
+    if (status == WAIT_FAILED) {
+        qWarning() << "WaitForMultipleObjects failed:" << GetLastError();
         return false;
+    }
+    if (status >= WAIT_OBJECT_0 && status <= (WAIT_OBJECT_0 + fds_count - 1)) {
+        emit eventReceived();
     }
 
     return true;
@@ -85,7 +66,7 @@ bool FreeRdpEventLoop::waitFds(void** rfds, int rcount, void** wfds, int wcount)
 
 #elif defined(Q_OS_UNIX)
 
-bool FreeRdpEventLoop::waitFds(void** rfds, int rcount, void** wfds, int wcount) {
+bool FreeRdpFdsListenerThread::waitFds(void** rfds, int rcount, void** wfds, int wcount) {
     int max_fds = 0;
     timeval timeout;
     fd_set rfds_set;
@@ -114,16 +95,16 @@ bool FreeRdpEventLoop::waitFds(void** rfds, int rcount, void** wfds, int wcount)
         return false;
     }
 
-    int select_status = select(max_fds + 1, &rfds_set, NULL, NULL, &timeout);
+    int status = select(max_fds + 1, &rfds_set, NULL, NULL, &timeout);
 
-    if (select_status == 0) {
-        return true;
-    } else if (select_status == -1) {
-        /* these are not really errors */
+    if (status > 0) {
+        emit eventReceived();
+    } else if (status == -1) {
+        // these are not really errors
         if (!((errno == EAGAIN) || (errno == EWOULDBLOCK) ||
-            (errno == EINPROGRESS) || (errno == EINTR))) /* signal occurred */
+            (errno == EINPROGRESS) || (errno == EINTR)))
         {
-            fprintf(stderr, "xfreerdp_run: select failed\n");
+            qWarning() << "select failed:" << errno;
             return false;
         }
     }
@@ -134,3 +115,33 @@ bool FreeRdpEventLoop::waitFds(void** rfds, int rcount, void** wfds, int wcount)
 #else
 #error Implementation missing for current platform!
 #endif
+
+FreeRdpEventLoop::FreeRdpEventLoop(QObject *parent) :
+    QObject(parent), thread(nullptr) {
+}
+
+FreeRdpEventLoop::~FreeRdpEventLoop() {
+    if (thread) {
+        thread->shouldQuit = false;
+        thread->wait();
+        delete thread;
+    }
+}
+
+void FreeRdpEventLoop::listen(freerdp *instance) {
+    if (!thread) {
+        thread = new FreeRdpFdsListenerThread;
+        thread->shouldQuit = false;
+        thread->freeRdpInstance = instance;
+        connect(thread, SIGNAL(eventReceived()), this, SIGNAL(eventReceived()));
+        connect(thread, SIGNAL(finished()), thread, SLOT(deleteLater()));
+        thread->start();
+    }
+}
+
+void FreeRdpEventLoop::stopListen() {
+    if (thread) {
+        thread->shouldQuit = false;
+    }
+}
+

@@ -12,6 +12,9 @@
 #include <QDebug>
 #include <QPainter>
 
+
+
+
 namespace {
 
 UINT16 qtMouseButtonToRdpButton(Qt::MouseButton button) {
@@ -80,10 +83,13 @@ void FreeRdpClient::BitmapUpdateCallback(rdpContext *context, BITMAP_UPDATE *upd
     emit self->desktopUpdated();
 }
 
+#include <QTimer>
+
 FreeRdpClient::FreeRdpClient()
     : freeRdpInstance(nullptr) {
     freerdp_wsa_startup();
     loop = new FreeRdpEventLoop(this);
+    connect(loop, SIGNAL(eventReceived()), this, SLOT(onRdpEventReceived()));
 }
 
 FreeRdpClient::~FreeRdpClient() {
@@ -96,7 +102,36 @@ FreeRdpClient::~FreeRdpClient() {
 }
 
 void FreeRdpClient::requestStop() {
-    loop->quit();
+    disconnectFromHost();
+}
+
+void FreeRdpClient::disconnectFromHost() {
+    if (freeRdpInstance) {
+        freerdp_disconnect(freeRdpInstance);
+
+        auto context = freeRdpInstance->context;
+        if (context && context->cache) {
+            cache_free(context->cache);
+        }
+    }
+}
+
+void FreeRdpClient::onError() {
+    disconnectFromHost();
+}
+
+void FreeRdpClient::onRdpEventReceived() {
+    if (freeRdpInstance) {
+        if (!freerdp_check_fds(freeRdpInstance)) {
+            qWarning() << "Failed to check FreeRDP file descriptor";
+            onError();
+            return;
+        }
+
+        if (freerdp_shall_disconnect(freeRdpInstance)) {
+            disconnectFromHost();
+        }
+    }
 }
 
 void FreeRdpClient::sendMouseMoveEvent(int x, int y) {
@@ -136,17 +171,12 @@ void FreeRdpClient::run() {
     context->cache = cache_new(freeRdpInstance->settings);
 
     if (!freerdp_connect(freeRdpInstance)) {
-        qDebug() << "Failed to connect";
+        qWarning() << "Failed to connect";
+        onError();
         return;
     }
 
-    loop->exec(freeRdpInstance);
-
-    freerdp_disconnect(freeRdpInstance);
-
-    if (context->cache) {
-        cache_free(context->cache);
-    }
+    loop->listen(freeRdpInstance);
 }
 
 void FreeRdpClient::initFreeRDP() {

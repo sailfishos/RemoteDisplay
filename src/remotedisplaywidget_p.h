@@ -16,7 +16,6 @@ class RemoteDisplayWidgetPrivate : public QObject {
 public:
     RemoteDisplayWidgetPrivate(RemoteDisplayWidget *q);
 
-    QPointer<QThread> processorThread;
     QPointer<FreeRdpClient> eventProcessor;
     QSize desktopSize;
 
