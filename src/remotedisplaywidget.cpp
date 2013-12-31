@@ -7,11 +7,20 @@
 #include <QThread>
 #include <QPointer>
 #include <QPaintEvent>
+#include <QPainter>
 
 RemoteDisplayWidgetPrivate::RemoteDisplayWidgetPrivate(RemoteDisplayWidget *q)
     : q_ptr(q) {
     processorThread = new QThread(q);
     processorThread->start();
+}
+
+QPoint RemoteDisplayWidgetPrivate::mapToRemoteDesktop(const QPoint &local) const {
+    QPoint remote = scaledDesktopMapper.map(local);
+    // limit remote point to desktop size
+    remote.setX(qMin(qMax(remote.x(), 0), desktopSize.width() - 1));
+    remote.setY(qMin(qMax(remote.y(), 0), desktopSize.height() - 1));
+    return remote;
 }
 
 void RemoteDisplayWidgetPrivate::onAboutToConnect() {
@@ -92,20 +101,48 @@ QSize RemoteDisplayWidget::sizeHint() const {
 
 void RemoteDisplayWidget::paintEvent(QPaintEvent *event) {
     Q_D(RemoteDisplayWidget);
-    d->eventProcessor->paintDesktopTo(this, event->rect());
+    QPainter painter(this);
+    painter.fillRect(rect(), Qt::black);
+
+    auto image = d->eventProcessor->getDesktopImage();
+    if (!image.isNull()) {
+        auto scaled = image.scaled(d->scaledDesktopRect.size(),
+            Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+        painter.drawImage(d->scaledDesktopRect, scaled);
+    }
 }
 
 void RemoteDisplayWidget::mouseMoveEvent(QMouseEvent *event) {
     Q_D(RemoteDisplayWidget);
-    d->eventProcessor->sendMouseMoveEvent(event->x(), event->y());
+    d->eventProcessor->sendMouseMoveEvent(d->mapToRemoteDesktop(event->pos()));
 }
 
 void RemoteDisplayWidget::mousePressEvent(QMouseEvent *event) {
     Q_D(RemoteDisplayWidget);
-    d->eventProcessor->sendMousePressEvent(event->button(), event->x(), event->y());
+    d->eventProcessor->sendMousePressEvent(event->button(),
+        d->mapToRemoteDesktop(event->pos()));
 }
 
 void RemoteDisplayWidget::mouseReleaseEvent(QMouseEvent *event) {
     Q_D(RemoteDisplayWidget);
-    d->eventProcessor->sendMouseReleaseEvent(event->button(), event->x(), event->y());
+    d->eventProcessor->sendMouseReleaseEvent(event->button(),
+        d->mapToRemoteDesktop(event->pos()));
+}
+
+void RemoteDisplayWidget::resizeEvent(QResizeEvent *event) {
+    Q_D(RemoteDisplayWidget);
+
+    QSize scaledSize = d->desktopSize;
+    scaledSize.scale(event->size(), Qt::KeepAspectRatio);
+    d->scaledDesktopRect.setSize(scaledSize);
+    d->scaledDesktopRect.moveCenter(rect().center());
+
+    // setup QTransform for mapToRemoteDesktop() method
+    qreal scaleX = (qreal)d->desktopSize.width() / (qreal)scaledSize.width();
+    qreal scaleY = (qreal)d->desktopSize.height() / (qreal)scaledSize.height();
+    d->scaledDesktopMapper.reset();
+    d->scaledDesktopMapper.scale(scaleX, scaleY);
+    d->scaledDesktopMapper.translate(-d->scaledDesktopRect.left(), -d->scaledDesktopRect.top());
+
+    QWidget::resizeEvent(event);
 }

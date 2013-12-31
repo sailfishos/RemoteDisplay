@@ -15,11 +15,11 @@ public:
     FreeRdpClient();
     ~FreeRdpClient();
 
-    void paintDesktopTo(QPaintDevice *device, const QRect &rect);
+    QImage getDesktopImage() const;
 
-    void sendMouseMoveEvent(int x, int y);
-    void sendMousePressEvent(Qt::MouseButton button, int x, int y);
-    void sendMouseReleaseEvent(Qt::MouseButton button, int x, int y);
+    void sendMouseMoveEvent(const QPoint &pos);
+    void sendMousePressEvent(Qt::MouseButton button, const QPoint &pos);
+    void sendMouseReleaseEvent(Qt::MouseButton button, const QPoint &pos);
 
 public slots:
     void setSettingServerHostName(const QString &host);
@@ -38,7 +38,7 @@ signals:
 
 private:
     void initFreeRDP();
-    void sendMouseEvent(UINT16 flags, int x, int y);
+    void sendMouseEvent(UINT16 flags, const QPoint &pos);
 
     static void BitmapUpdateCallback(rdpContext *context, BITMAP_UPDATE *updates);
     static BOOL PreConnectCallback(freerdp* instance);

@@ -5,6 +5,7 @@
 #include <QPointer>
 #include <QQueue>
 #include <QMutex>
+#include <QTransform>
 
 class RemoteDisplayWidget;
 class QThread;
@@ -16,9 +17,13 @@ class RemoteDisplayWidgetPrivate : public QObject {
 public:
     RemoteDisplayWidgetPrivate(RemoteDisplayWidget *q);
 
+    QPoint mapToRemoteDesktop(const QPoint &local) const;
+
     QPointer<QThread> processorThread;
     QPointer<FreeRdpClient> eventProcessor;
     QSize desktopSize;
+    QRect scaledDesktopRect;
+    QTransform scaledDesktopMapper;
 
     Q_DECLARE_PUBLIC(RemoteDisplayWidget)
     RemoteDisplayWidget* const q_ptr;

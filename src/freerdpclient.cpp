@@ -82,31 +82,31 @@ void FreeRdpClient::requestStop() {
     loop->quit();
 }
 
-void FreeRdpClient::sendMouseMoveEvent(int x, int y) {
-    sendMouseEvent(PTR_FLAGS_MOVE, x, y);
+void FreeRdpClient::sendMouseMoveEvent(const QPoint &pos) {
+    sendMouseEvent(PTR_FLAGS_MOVE, pos);
 }
 
-void FreeRdpClient::sendMousePressEvent(Qt::MouseButton button, int x, int y) {
+void FreeRdpClient::sendMousePressEvent(Qt::MouseButton button, const QPoint &pos) {
     auto rdpButton = qtMouseButtonToRdpButton(button);
     if (!rdpButton) {
         return;
     }
-    sendMouseEvent(rdpButton | PTR_FLAGS_DOWN, x, y);
+    sendMouseEvent(rdpButton | PTR_FLAGS_DOWN, pos);
 }
 
-void FreeRdpClient::sendMouseReleaseEvent(Qt::MouseButton button, int x, int y) {
+void FreeRdpClient::sendMouseReleaseEvent(Qt::MouseButton button, const QPoint &pos) {
     auto rdpButton = qtMouseButtonToRdpButton(button);
     if (!rdpButton) {
         return;
     }
-    sendMouseEvent(rdpButton, x, y);
+    sendMouseEvent(rdpButton, pos);
 }
 
-void FreeRdpClient::paintDesktopTo(QPaintDevice *device, const QRect &rect) {
+QImage FreeRdpClient::getDesktopImage() const {
     if (remoteScreenBuffer) {
-        QPainter painter(device);
-        painter.drawImage(rect, remoteScreenBuffer->createImage(), rect);
+        return remoteScreenBuffer->createImage();
     }
+    return QImage();
 }
 
 void FreeRdpClient::run() {
@@ -159,13 +159,13 @@ void FreeRdpClient::initFreeRDP() {
     settings->EmbeddedWindow = TRUE;
 }
 
-void FreeRdpClient::sendMouseEvent(UINT16 flags, int x, int y) {
+void FreeRdpClient::sendMouseEvent(UINT16 flags, const QPoint &pos) {
     // note that this method is called from another thread, so lots of checking
     // is needed, perhaps we would need a mutex as well?
     if (freeRdpInstance) {
         auto input = freeRdpInstance->input;
         if (input && input->MouseEvent) {
-            input->MouseEvent(input, flags, x, y);
+            input->MouseEvent(input, flags, pos.x(), pos.y());
         }
     }
 }
