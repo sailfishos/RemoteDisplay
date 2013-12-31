@@ -2,12 +2,12 @@
 #define FREERDPCLIENT_H
 
 #include <QWidget>
-#include <QMutex>
 #include <QPointer>
 #include <freerdp/freerdp.h>
 
 class FreeRdpEventLoop;
 class Cursor;
+class RemoteScreenBuffer;
 
 class FreeRdpClient : public QObject {
     Q_OBJECT
@@ -46,8 +46,7 @@ private:
     static void PostDisconnectCallback(freerdp* instance);
 
     freerdp* freeRdpInstance;
-    QMutex offScreenBufferMutex;
-    QImage offScreenBuffer;
+    QPointer<RemoteScreenBuffer> remoteScreenBuffer;
     QPointer<FreeRdpEventLoop> loop;
 };
 

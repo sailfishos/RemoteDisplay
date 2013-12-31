@@ -2,11 +2,11 @@
 #include "freerdpeventloop.h"
 #include "cursorchangenotifier.h"
 #include "freerdphelpers.h"
+#include "remotescreenbuffer.h"
 
 #include <freerdp/freerdp.h>
 #include <freerdp/input.h>
 #include <freerdp/utils/tcp.h>
-#include <freerdp/codec/bitmap.h>
 #include <freerdp/cache/pointer.h>
 
 #include <QDebug>
@@ -32,12 +32,16 @@ BOOL FreeRdpClient::PreConnectCallback(freerdp* instance) {
 
 BOOL FreeRdpClient::PostConnectCallback(freerdp* instance) {
     auto context = getMyContext(instance);
+    auto settings = instance->context->settings;
     auto self = context->self;
     emit self->connected();
     pointer_cache_register_callbacks(instance->update);
 
     auto notifier = new CursorChangeNotifier(context, self);
     connect(notifier, SIGNAL(cursorChanged(Cursor)), self, SIGNAL(cursorChanged(Cursor)));
+
+    self->remoteScreenBuffer = new RemoteScreenBuffer(settings->DesktopWidth,
+        settings->DesktopHeight, settings->ColorDepth, self);
 
     return TRUE;
 }
@@ -49,33 +53,12 @@ void FreeRdpClient::PostDisconnectCallback(freerdp* instance) {
 void FreeRdpClient::BitmapUpdateCallback(rdpContext *context, BITMAP_UPDATE *updates) {
     auto self = getMyContext(context)->self;
 
-    QMutexLocker locker(&self->offScreenBufferMutex);
-    QPainter painter(&self->offScreenBuffer);
-
     for (quint32 i = 0; i < updates->number; i++) {
-        auto update = &updates->rectangles[i];
+        auto u = &updates->rectangles[i];
+        QRect rect(u->destLeft, u->destTop, u->width, u->height);
+        QByteArray data((char*)u->bitmapDataStream, u->bitmapLength);
 
-        if (!update->compressed) {
-            qWarning() << "Handling uncompressed bitmap updates not implemented";
-            continue;
-        }
-
-        quint32 w = update->width;
-        quint32 h = update->height;
-        quint32 bpp = update->bitsPerPixel;
-        BYTE* srcData = update->bitmapDataStream;
-        quint32 srcLength = update->bitmapLength;
-
-        // decompress update's image data to 'imgData'
-        QByteArray imgData;
-        imgData.resize(w * h * (bpp / 8));
-        if (!bitmap_decompress(srcData, (BYTE*)imgData.data(), w, h, srcLength, bpp, bpp)) {
-            qWarning() << "Bitmap update decompression failed";
-        }
-
-        QRect rect(update->destLeft, update->destTop, w, h);
-        QImage image((uchar*)imgData.data(), w, h, bppToImageFormat(bpp));
-        painter.drawImage(rect, image);
+        self->remoteScreenBuffer->addRectangle(rect, data);
     }
     emit self->desktopUpdated();
 }
@@ -120,11 +103,9 @@ void FreeRdpClient::sendMouseReleaseEvent(Qt::MouseButton button, int x, int y) 
 }
 
 void FreeRdpClient::paintDesktopTo(QPaintDevice *device, const QRect &rect) {
-    auto self = getMyContext(freeRdpInstance)->self;
-    if (self) {
-        QMutexLocker locker(&self->offScreenBufferMutex);
+    if (remoteScreenBuffer) {
         QPainter painter(device);
-        painter.drawImage(rect, self->offScreenBuffer, rect);
+        painter.drawImage(rect, remoteScreenBuffer->createImage(), rect);
     }
 }
 
@@ -208,12 +189,4 @@ void FreeRdpClient::setSettingDesktopSize(quint16 width, quint16 height) {
     auto settings = freeRdpInstance->settings;
     settings->DesktopWidth = width;
     settings->DesktopHeight = height;
-
-    QMutexLocker locker(&offScreenBufferMutex);
-    if (offScreenBuffer.isNull()) {
-        offScreenBuffer = QImage(width, height, QImage::Format_RGB32);
-        offScreenBuffer.fill(0);
-    } else {
-        offScreenBuffer = offScreenBuffer.copy(0, 0, width, height);
-    }
 }
