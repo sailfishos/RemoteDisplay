@@ -44,6 +44,7 @@ void ScaledScreenBuffer::scaleToFit(const QSize &size) {
 
         qreal scaleX = (qreal)sourceSize.width() / (qreal)d->scaledSize.width();
         qreal scaleY = (qreal)sourceSize.height() / (qreal)d->scaledSize.height();
+        d->coordinateTransform.reset();
         d->coordinateTransform.scale(scaleX, scaleY);
     }
 }
