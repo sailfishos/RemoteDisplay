@@ -16,7 +16,7 @@ include(${QT_USE_FILE})
 include_directories(${FreeRDP_INCLUDE_DIR} ${WinPR_INCLUDE_DIR})
 
 aux_source_directory(. SRC_LIST)
-list(APPEND SRC_LIST global.h remotedisplaywidget_p.h freerdphelpers.h)
+list(APPEND SRC_LIST global.h remotedisplaywidget_p.h freerdphelpers.h screenbuffer.h)
 
 add_library(${PROJECT_NAME} SHARED ${SRC_LIST})
 set_property(TARGET ${PROJECT_NAME} PROPERTY COMPILE_DEFINITIONS REMOTEDISPLAY_LIBRARY)

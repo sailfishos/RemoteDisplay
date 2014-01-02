@@ -34,7 +34,6 @@ BOOL FreeRdpClient::PostConnectCallback(freerdp* instance) {
     auto context = getMyContext(instance);
     auto settings = instance->context->settings;
     auto self = context->self;
-    emit self->connected();
     pointer_cache_register_callbacks(instance->update);
 
     auto notifier = new CursorChangeNotifier(context, self);
@@ -42,6 +41,8 @@ BOOL FreeRdpClient::PostConnectCallback(freerdp* instance) {
 
     self->remoteScreenBuffer = new RemoteScreenBuffer(settings->DesktopWidth,
         settings->DesktopHeight, settings->ColorDepth, self);
+
+    emit self->connected();
 
     return TRUE;
 }
@@ -102,11 +103,8 @@ void FreeRdpClient::sendMouseReleaseEvent(Qt::MouseButton button, const QPoint &
     sendMouseEvent(rdpButton, pos);
 }
 
-QImage FreeRdpClient::getDesktopImage() const {
-    if (remoteScreenBuffer) {
-        return remoteScreenBuffer->createImage();
-    }
-    return QImage();
+ScreenBuffer* FreeRdpClient::getScreenBuffer() const {
+    return remoteScreenBuffer;
 }
 
 void FreeRdpClient::run() {

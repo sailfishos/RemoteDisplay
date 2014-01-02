@@ -11,6 +11,7 @@ class RemoteDisplayWidget;
 class QThread;
 class FreeRdpClient;
 class Cursor;
+class ScaledScreenBuffer;
 
 class RemoteDisplayWidgetPrivate : public QObject {
     Q_OBJECT
@@ -18,12 +19,14 @@ public:
     RemoteDisplayWidgetPrivate(RemoteDisplayWidget *q);
 
     QPoint mapToRemoteDesktop(const QPoint &local) const;
+    void updateScreenBuffers();
 
     QPointer<QThread> processorThread;
     QPointer<FreeRdpClient> eventProcessor;
     QSize desktopSize;
-    QRect scaledDesktopRect;
-    QTransform scaledDesktopMapper;
+    QRect translatedDesktopRect;
+    QTransform translatedDesktopMapper;
+    QPointer<ScaledScreenBuffer> screenBuffer;
 
     Q_DECLARE_PUBLIC(RemoteDisplayWidget)
     RemoteDisplayWidget* const q_ptr;

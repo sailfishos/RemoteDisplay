@@ -8,6 +8,7 @@
 class FreeRdpEventLoop;
 class Cursor;
 class RemoteScreenBuffer;
+class ScreenBuffer;
 
 class FreeRdpClient : public QObject {
     Q_OBJECT
@@ -15,7 +16,7 @@ public:
     FreeRdpClient();
     ~FreeRdpClient();
 
-    QImage getDesktopImage() const;
+    ScreenBuffer* getScreenBuffer() const;
 
     void sendMouseMoveEvent(const QPoint &pos);
     void sendMousePressEvent(Qt::MouseButton button, const QPoint &pos);
