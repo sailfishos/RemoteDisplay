@@ -8,13 +8,19 @@ int main(int argc, char *argv[]) {
     RemoteDisplayWidget w;
 
     auto args = a.arguments();
-    if (args.count() < 3) {
-        qCritical("Usage: Example.exe <host> <port>");
+    if (args.count() < 5) {
+        qCritical("Usage: Example.exe <host> <port> <width> <height>");
         return -1;
     }
 
-    w.setDesktopSize(540, 960);
-    w.connectToHost(args.at(1), args.at(2).toInt());
+    auto host = args.at(1);
+    auto port = args.at(2).toInt();
+    auto width = args.at(3).toInt();
+    auto height = args.at(4).toInt();
+
+    w.resize(width, height);
+    w.setDesktopSize(width, height);
+    w.connectToHost(host, port);
     w.show();
 
     return a.exec();
