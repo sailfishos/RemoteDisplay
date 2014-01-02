@@ -7,7 +7,7 @@
 
 class FreeRdpEventLoop;
 class Cursor;
-class RemoteScreenBuffer;
+class BitmapRectangleSink;
 class ScreenBuffer;
 
 class FreeRdpClient : public QObject {
@@ -16,7 +16,9 @@ public:
     FreeRdpClient();
     ~FreeRdpClient();
 
-    ScreenBuffer* getScreenBuffer() const;
+    void setBitmapRectangleSink(BitmapRectangleSink *sink);
+
+    quint8 getDesktopBpp() const;
 
     void sendMouseMoveEvent(const QPoint &pos);
     void sendMousePressEvent(Qt::MouseButton button, const QPoint &pos);
@@ -47,7 +49,7 @@ private:
     static void PostDisconnectCallback(freerdp* instance);
 
     freerdp* freeRdpInstance;
-    QPointer<RemoteScreenBuffer> remoteScreenBuffer;
+    BitmapRectangleSink *bitmapRectangleSink;
     QPointer<FreeRdpEventLoop> loop;
 };
 

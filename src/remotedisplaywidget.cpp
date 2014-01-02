@@ -2,6 +2,7 @@
 #include "remotedisplaywidget_p.h"
 #include "freerdpclient.h"
 #include "cursorchangenotifier.h"
+#include "remotescreenbuffer.h"
 #include "scaledscreenbuffer.h"
 #include "letterboxedscreenbuffer.h"
 
@@ -42,8 +43,16 @@ void RemoteDisplayWidgetPrivate::onAboutToConnect() {
 
 void RemoteDisplayWidgetPrivate::onConnected() {
     qDebug() << "ON CONNECTED";
-    scaledScreenBuffer = new ScaledScreenBuffer(eventProcessor->getScreenBuffer(), this);
+    auto bpp = eventProcessor->getDesktopBpp();
+    auto width = desktopSize.width();
+    auto height = desktopSize.height();
+
+    remoteScreenBuffer = new RemoteScreenBuffer(width, height, bpp, this);
+    scaledScreenBuffer = new ScaledScreenBuffer(remoteScreenBuffer, this);
     letterboxedScreenBuffer = new LetterboxedScreenBuffer(scaledScreenBuffer, this);
+
+    eventProcessor->setBitmapRectangleSink(remoteScreenBuffer);
+
     resizeScreenBuffers();
 }
 

@@ -11,6 +11,7 @@ class RemoteDisplayWidget;
 class QThread;
 class FreeRdpClient;
 class Cursor;
+class RemoteScreenBuffer;
 class ScaledScreenBuffer;
 class LetterboxedScreenBuffer;
 
@@ -27,6 +28,7 @@ public:
     QSize desktopSize;
     QRect translatedDesktopRect;
     QTransform translatedDesktopMapper;
+    QPointer<RemoteScreenBuffer> remoteScreenBuffer;
     QPointer<ScaledScreenBuffer> scaledScreenBuffer;
     QPointer<LetterboxedScreenBuffer> letterboxedScreenBuffer;
 

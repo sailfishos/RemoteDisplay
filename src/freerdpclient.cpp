@@ -2,7 +2,7 @@
 #include "freerdpeventloop.h"
 #include "cursorchangenotifier.h"
 #include "freerdphelpers.h"
-#include "remotescreenbuffer.h"
+#include "bitmaprectanglesink.h"
 
 #include <freerdp/freerdp.h>
 #include <freerdp/input.h>
@@ -39,9 +39,6 @@ BOOL FreeRdpClient::PostConnectCallback(freerdp* instance) {
     auto notifier = new CursorChangeNotifier(context, self);
     connect(notifier, SIGNAL(cursorChanged(Cursor)), self, SIGNAL(cursorChanged(Cursor)));
 
-    self->remoteScreenBuffer = new RemoteScreenBuffer(settings->DesktopWidth,
-        settings->DesktopHeight, settings->ColorDepth, self);
-
     emit self->connected();
 
     return TRUE;
@@ -53,19 +50,21 @@ void FreeRdpClient::PostDisconnectCallback(freerdp* instance) {
 
 void FreeRdpClient::BitmapUpdateCallback(rdpContext *context, BITMAP_UPDATE *updates) {
     auto self = getMyContext(context)->self;
+    auto sink = self->bitmapRectangleSink;
 
-    for (quint32 i = 0; i < updates->number; i++) {
-        auto u = &updates->rectangles[i];
-        QRect rect(u->destLeft, u->destTop, u->width, u->height);
-        QByteArray data((char*)u->bitmapDataStream, u->bitmapLength);
-
-        self->remoteScreenBuffer->addRectangle(rect, data);
+    if (sink) {
+        for (quint32 i = 0; i < updates->number; i++) {
+            auto u = &updates->rectangles[i];
+            QRect rect(u->destLeft, u->destTop, u->width, u->height);
+            QByteArray data((char*)u->bitmapDataStream, u->bitmapLength);
+            sink->addRectangle(rect, data);
+        }
+        emit self->desktopUpdated();
     }
-    emit self->desktopUpdated();
 }
 
 FreeRdpClient::FreeRdpClient()
-    : freeRdpInstance(nullptr) {
+    : freeRdpInstance(nullptr), bitmapRectangleSink(nullptr) {
     freerdp_wsa_startup();
     loop = new FreeRdpEventLoop(this);
 }
@@ -103,8 +102,15 @@ void FreeRdpClient::sendMouseReleaseEvent(Qt::MouseButton button, const QPoint &
     sendMouseEvent(rdpButton, pos);
 }
 
-ScreenBuffer* FreeRdpClient::getScreenBuffer() const {
-    return remoteScreenBuffer;
+void FreeRdpClient::setBitmapRectangleSink(BitmapRectangleSink *sink) {
+    bitmapRectangleSink = sink;
+}
+
+quint8 FreeRdpClient::getDesktopBpp() const {
+    if (freeRdpInstance && freeRdpInstance->settings) {
+        return freeRdpInstance->settings->ColorDepth;
+    }
+    return 0;
 }
 
 void FreeRdpClient::run() {
