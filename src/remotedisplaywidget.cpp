@@ -3,6 +3,7 @@
 #include "freerdpclient.h"
 #include "cursorchangenotifier.h"
 #include "scaledscreenbuffer.h"
+#include "letterboxedscreenbuffer.h"
 
 #include <QDebug>
 #include <QThread>
@@ -12,36 +13,26 @@
 
 RemoteDisplayWidgetPrivate::RemoteDisplayWidgetPrivate(RemoteDisplayWidget *q)
     : q_ptr(q) {
-    screenBuffer = nullptr;
     processorThread = new QThread(q);
     processorThread->start();
 }
 
 QPoint RemoteDisplayWidgetPrivate::mapToRemoteDesktop(const QPoint &local) const {
     QPoint remote;
-    if (screenBuffer) {
-        remote = screenBuffer->mapToSource(translatedDesktopMapper.map(local));
-        // limit remote point to desktop size
-        remote.setX(qMin(qMax(remote.x(), 0), desktopSize.width() - 1));
-        remote.setY(qMin(qMax(remote.y(), 0), desktopSize.height() - 1));
+    if (scaledScreenBuffer && letterboxedScreenBuffer) {
+        remote = scaledScreenBuffer->mapToSource(
+                    letterboxedScreenBuffer->mapToSource(local));
     }
     return remote;
 }
 
-void RemoteDisplayWidgetPrivate::updateScreenBuffers() {
+void RemoteDisplayWidgetPrivate::resizeScreenBuffers() {
     Q_Q(RemoteDisplayWidget);
-    if (screenBuffer) {
-        screenBuffer->scaleToFit(q->size());
-
-        auto image = screenBuffer->createImage();
-        if (!image.isNull()) {
-            translatedDesktopRect.setSize(image.size());
-            translatedDesktopRect.moveCenter(q->rect().center());
-
-            translatedDesktopMapper.reset();
-            translatedDesktopMapper.translate(-translatedDesktopRect.left(),
-                                              -translatedDesktopRect.top());
-        }
+    if (scaledScreenBuffer) {
+        scaledScreenBuffer->scaleToFit(q->size());
+    }
+    if (letterboxedScreenBuffer) {
+        letterboxedScreenBuffer->resize(q->size());
     }
 }
 
@@ -51,8 +42,9 @@ void RemoteDisplayWidgetPrivate::onAboutToConnect() {
 
 void RemoteDisplayWidgetPrivate::onConnected() {
     qDebug() << "ON CONNECTED";
-    screenBuffer = new ScaledScreenBuffer(eventProcessor->getScreenBuffer(), this);
-    updateScreenBuffers();
+    scaledScreenBuffer = new ScaledScreenBuffer(eventProcessor->getScreenBuffer(), this);
+    letterboxedScreenBuffer = new LetterboxedScreenBuffer(scaledScreenBuffer, this);
+    resizeScreenBuffers();
 }
 
 void RemoteDisplayWidgetPrivate::onDisconnected() {
@@ -125,13 +117,11 @@ QSize RemoteDisplayWidget::sizeHint() const {
 
 void RemoteDisplayWidget::paintEvent(QPaintEvent *event) {
     Q_D(RemoteDisplayWidget);
-    QPainter painter(this);
-    painter.fillRect(rect(), Qt::black);
-
-    if (d->screenBuffer) {
-        auto image = d->screenBuffer->createImage();
+    if (d->letterboxedScreenBuffer) {
+        auto image = d->letterboxedScreenBuffer->createImage();
         if (!image.isNull()) {
-            painter.drawImage(d->translatedDesktopRect, image);
+            QPainter painter(this);
+            painter.drawImage(rect(), image);
         }
     }
 }
@@ -155,6 +145,6 @@ void RemoteDisplayWidget::mouseReleaseEvent(QMouseEvent *event) {
 
 void RemoteDisplayWidget::resizeEvent(QResizeEvent *event) {
     Q_D(RemoteDisplayWidget);
-    d->updateScreenBuffers();
+    d->resizeScreenBuffers();
     QWidget::resizeEvent(event);
 }
