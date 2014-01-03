@@ -4,9 +4,8 @@
 #include <QObject>
 #include <QImage>
 #include <QMetaType>
-#include <freerdp/graphics.h>
 
-struct MyContext;
+typedef struct rdp_pointer rdpPointer;
 class QCursor;
 
 class Cursor {
@@ -27,17 +26,16 @@ class CursorChangeNotifier : public QObject
 {
     Q_OBJECT
 public:
-    CursorChangeNotifier(MyContext *context, QObject *parent = 0);
+    CursorChangeNotifier(QObject *parent = 0);
+
+    void addPointer(rdpPointer* pointer);
+    void removePointer(rdpPointer* pointer);
+    void changePointer(rdpPointer* pointer);
+
+    int getPointerStructSize() const;
 
 signals:
     void cursorChanged(const Cursor &cursor);
-
-private:
-    static void myPointerCreate(rdpContext* context, rdpPointer* pointer);
-    static void myPointerFree(rdpContext* context, rdpPointer* pointer);
-    static void myPointerSet(rdpContext* context, rdpPointer* pointer);
-    static void myPointerSetNull(rdpContext* context);
-    static void myPointerSetDefault(rdpContext* context);
 };
 
 #endif // CURSORCHANGENOTIFIER_H

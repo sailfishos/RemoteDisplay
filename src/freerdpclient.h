@@ -9,6 +9,7 @@ class FreeRdpEventLoop;
 class Cursor;
 class BitmapRectangleSink;
 class ScreenBuffer;
+class CursorChangeNotifier;
 
 class FreeRdpClient : public QObject {
     Q_OBJECT
@@ -48,9 +49,14 @@ private:
     static BOOL PostConnectCallback(freerdp* instance);
     static void PostDisconnectCallback(freerdp* instance);
 
+    static void PointerNewCallback(rdpContext* context, rdpPointer* pointer);
+    static void PointerFreeCallback(rdpContext* context, rdpPointer* pointer);
+    static void PointerSetCallback(rdpContext* context, rdpPointer* pointer);
+
     freerdp* freeRdpInstance;
     BitmapRectangleSink *bitmapRectangleSink;
     QPointer<FreeRdpEventLoop> loop;
+    QPointer<CursorChangeNotifier> cursorNotifier;
 };
 
 #endif // FREERDPCLIENT_H

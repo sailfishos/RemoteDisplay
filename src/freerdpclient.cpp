@@ -36,8 +36,18 @@ BOOL FreeRdpClient::PostConnectCallback(freerdp* instance) {
     auto self = context->self;
     pointer_cache_register_callbacks(instance->update);
 
-    auto notifier = new CursorChangeNotifier(context, self);
-    connect(notifier, SIGNAL(cursorChanged(Cursor)), self, SIGNAL(cursorChanged(Cursor)));
+    self->cursorNotifier = new CursorChangeNotifier(self);
+    connect(self->cursorNotifier, SIGNAL(cursorChanged(Cursor)), self, SIGNAL(cursorChanged(Cursor)));
+
+    rdpPointer pointer;
+    memset(&pointer, 0, sizeof(rdpPointer));
+    pointer.size = self->cursorNotifier->getPointerStructSize();
+    pointer.New = PointerNewCallback;
+    pointer.Free = PointerFreeCallback;
+    pointer.Set = PointerSetCallback;
+    pointer.SetNull = NULL;
+    pointer.SetDefault = NULL;
+    graphics_register_pointer(context->freeRdpContext.graphics, &pointer);
 
     emit self->connected();
 
@@ -46,6 +56,18 @@ BOOL FreeRdpClient::PostConnectCallback(freerdp* instance) {
 
 void FreeRdpClient::PostDisconnectCallback(freerdp* instance) {
     emit getMyContext(instance)->self->disconnected();
+}
+
+void FreeRdpClient::PointerNewCallback(rdpContext *context, rdpPointer *pointer) {
+    getMyContext(context)->self->cursorNotifier->addPointer(pointer);
+}
+
+void FreeRdpClient::PointerFreeCallback(rdpContext *context, rdpPointer *pointer) {
+    getMyContext(context)->self->cursorNotifier->removePointer(pointer);
+}
+
+void FreeRdpClient::PointerSetCallback(rdpContext *context, rdpPointer *pointer) {
+    getMyContext(context)->self->cursorNotifier->changePointer(pointer);
 }
 
 void FreeRdpClient::BitmapUpdateCallback(rdpContext *context, BITMAP_UPDATE *updates) {

@@ -1,7 +1,7 @@
 #include "freerdphelpers.h"
 #include <QDebug>
 
-MyContext::MyContext() : self(nullptr), cursorChangeNotifier(nullptr) {
+MyContext::MyContext() : self(nullptr) {
 }
 
 MyContext* getMyContext(rdpContext* context) {

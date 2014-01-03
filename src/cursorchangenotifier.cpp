@@ -36,27 +36,12 @@ Cursor::operator QCursor() const {
 }
 
 
-CursorChangeNotifier::CursorChangeNotifier(MyContext *context, QObject *parent)
+CursorChangeNotifier::CursorChangeNotifier(QObject *parent)
     : QObject(parent) {
     qRegisterMetaType<Cursor>();
-
-    Q_ASSERT(!context->cursorChangeNotifier);
-    context->cursorChangeNotifier = this;
-
-    rdpPointer pointer;
-    memset(&pointer, 0, sizeof(rdpPointer));
-    pointer.size = sizeof(MyPointer);
-    pointer.New = myPointerCreate;
-    pointer.Free = myPointerFree;
-    pointer.Set = myPointerSet;
-    pointer.SetNull = myPointerSetNull;
-    pointer.SetDefault = myPointerSetDefault;
-    graphics_register_pointer(context->freeRdpContext.graphics, &pointer);
 }
 
-void CursorChangeNotifier::myPointerCreate(rdpContext* context, rdpPointer* pointer) {
-    Q_UNUSED(context);
-
+void CursorChangeNotifier::addPointer(rdpPointer* pointer) {
     int w = pointer->width;
     int h = pointer->height;
 
@@ -79,22 +64,16 @@ void CursorChangeNotifier::myPointerCreate(rdpContext* context, rdpPointer* poin
     myPointer->myCursor = new Cursor(image, mask, pointer->xPos, pointer->yPos);
 }
 
-void CursorChangeNotifier::myPointerFree(rdpContext* context, rdpPointer* pointer) {
-    Q_UNUSED(context);
+void CursorChangeNotifier::removePointer(rdpPointer* pointer) {
     Q_UNUSED(pointer);
     delete getMyPointer(pointer)->myCursor;
 }
 
-void CursorChangeNotifier::myPointerSet(rdpContext* context, rdpPointer* pointer) {
-    auto self = getMyContext(context)->cursorChangeNotifier;
+void CursorChangeNotifier::changePointer(rdpPointer* pointer) {
     auto myPointer = getMyPointer(pointer);
-    emit self->cursorChanged(*myPointer->myCursor);
+    emit cursorChanged(*myPointer->myCursor);
 }
 
-void CursorChangeNotifier::myPointerSetNull(rdpContext* context) {
-    Q_UNUSED(context);
-}
-
-void CursorChangeNotifier::myPointerSetDefault(rdpContext* context) {
-    Q_UNUSED(context);
+int CursorChangeNotifier::getPointerStructSize() const {
+    return sizeof(MyPointer);
 }
