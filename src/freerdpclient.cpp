@@ -1,8 +1,8 @@
 #include "freerdpclient.h"
 #include "freerdpeventloop.h"
-#include "cursorchangenotifier.h"
 #include "freerdphelpers.h"
 #include "bitmaprectanglesink.h"
+#include "pointerchangesink.h"
 
 #include <freerdp/freerdp.h>
 #include <freerdp/input.h>
@@ -36,12 +36,9 @@ BOOL FreeRdpClient::PostConnectCallback(freerdp* instance) {
     auto self = context->self;
     pointer_cache_register_callbacks(instance->update);
 
-    self->cursorNotifier = new CursorChangeNotifier(self);
-    connect(self->cursorNotifier, SIGNAL(cursorChanged(Cursor)), self, SIGNAL(cursorChanged(Cursor)));
-
     rdpPointer pointer;
     memset(&pointer, 0, sizeof(rdpPointer));
-    pointer.size = self->cursorNotifier->getPointerStructSize();
+    pointer.size = self->pointerChangeSink->getPointerStructSize();
     pointer.New = PointerNewCallback;
     pointer.Free = PointerFreeCallback;
     pointer.Set = PointerSetCallback;
@@ -59,15 +56,15 @@ void FreeRdpClient::PostDisconnectCallback(freerdp* instance) {
 }
 
 void FreeRdpClient::PointerNewCallback(rdpContext *context, rdpPointer *pointer) {
-    getMyContext(context)->self->cursorNotifier->addPointer(pointer);
+    getMyContext(context)->self->pointerChangeSink->addPointer(pointer);
 }
 
 void FreeRdpClient::PointerFreeCallback(rdpContext *context, rdpPointer *pointer) {
-    getMyContext(context)->self->cursorNotifier->removePointer(pointer);
+    getMyContext(context)->self->pointerChangeSink->removePointer(pointer);
 }
 
 void FreeRdpClient::PointerSetCallback(rdpContext *context, rdpPointer *pointer) {
-    getMyContext(context)->self->cursorNotifier->changePointer(pointer);
+    getMyContext(context)->self->pointerChangeSink->changePointer(pointer);
 }
 
 void FreeRdpClient::BitmapUpdateCallback(rdpContext *context, BITMAP_UPDATE *updates) {
@@ -85,8 +82,9 @@ void FreeRdpClient::BitmapUpdateCallback(rdpContext *context, BITMAP_UPDATE *upd
     }
 }
 
-FreeRdpClient::FreeRdpClient()
-    : freeRdpInstance(nullptr), bitmapRectangleSink(nullptr) {
+FreeRdpClient::FreeRdpClient(PointerChangeSink *pointerSink)
+    : freeRdpInstance(nullptr), bitmapRectangleSink(nullptr),
+      pointerChangeSink(pointerSink) {
     freerdp_wsa_startup();
     loop = new FreeRdpEventLoop(this);
 }

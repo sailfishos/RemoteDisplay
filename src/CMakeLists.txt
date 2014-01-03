@@ -22,6 +22,7 @@ list(APPEND SRC_LIST
     freerdphelpers.h
     screenbuffer.h
     bitmaprectanglesink.h
+    pointerchangesink.h
 )
 
 add_library(${PROJECT_NAME} SHARED ${SRC_LIST})

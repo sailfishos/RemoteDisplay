@@ -5,7 +5,8 @@
 #include <QImage>
 #include <QMetaType>
 
-typedef struct rdp_pointer rdpPointer;
+#include "pointerchangesink.h"
+
 class QCursor;
 
 class Cursor {
@@ -22,19 +23,43 @@ private:
 };
 Q_DECLARE_METATYPE(Cursor)
 
-class CursorChangeNotifier : public QObject
-{
+/**
+ * The CursorChangeNotifier class notifies when mouse cursor's style should
+ * be changed.
+ *
+ * RDP server passes the currently shown mouse cursor's style over network when
+ * ever the style changes. This class receives those updates and emits the
+ * changed cursor style so that it can be applied in the widget.
+ */
+class CursorChangeNotifier : public QObject, public PointerChangeSink {
     Q_OBJECT
 public:
     CursorChangeNotifier(QObject *parent = 0);
 
-    void addPointer(rdpPointer* pointer);
-    void removePointer(rdpPointer* pointer);
-    void changePointer(rdpPointer* pointer);
+    /**
+     * Implemented from PointerChangeSink.
+     */
+    virtual int getPointerStructSize() const;
 
-    int getPointerStructSize() const;
+    /**
+     * Implemented from PointerChangeSink.
+     */
+    virtual void addPointer(rdpPointer* pointer);
+
+    /**
+     * Implemented from PointerChangeSink.
+     */
+    virtual void removePointer(rdpPointer* pointer);
+
+    /**
+     * Implemented from PointerChangeSink.
+     */
+    virtual void changePointer(rdpPointer* pointer);
 
 signals:
+    /**
+     * This signal is emitted when current mouse cursor style changes.
+     */
     void cursorChanged(const Cursor &cursor);
 };
 

@@ -76,14 +76,16 @@ RemoteDisplayWidget::RemoteDisplayWidget(QWidget *parent)
     setAttribute(Qt::WA_NoSystemBackground);
     setMouseTracking(true);
 
-    d->eventProcessor = new FreeRdpClient;
+    auto cursorNotifier = new CursorChangeNotifier(this);
+    connect(cursorNotifier, SIGNAL(cursorChanged(Cursor)), d, SLOT(onCursorChanged(Cursor)));
+
+    d->eventProcessor = new FreeRdpClient(cursorNotifier);
     d->eventProcessor->moveToThread(d->processorThread);
 
     connect(d->eventProcessor, SIGNAL(aboutToConnect()), d, SLOT(onAboutToConnect()));
     connect(d->eventProcessor, SIGNAL(connected()), d, SLOT(onConnected()));
     connect(d->eventProcessor, SIGNAL(disconnected()), d, SLOT(onDisconnected()));
     connect(d->eventProcessor, SIGNAL(desktopUpdated()), this, SLOT(update()));
-    connect(d->eventProcessor, SIGNAL(cursorChanged(Cursor)), d, SLOT(onCursorChanged(Cursor)));
 }
 
 RemoteDisplayWidget::~RemoteDisplayWidget() {
