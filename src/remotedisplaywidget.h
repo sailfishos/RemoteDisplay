@@ -17,6 +17,13 @@ public:
 
     virtual QSize sizeHint() const;
 
+signals:
+    /**
+     * This signal is emitted when connecting to host fails or if already
+     * established connection breaks.
+     */
+    void disconnected();
+
 protected:
     virtual void paintEvent(QPaintEvent *event);
     virtual void mouseMoveEvent(QMouseEvent *event);

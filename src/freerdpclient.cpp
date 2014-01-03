@@ -142,6 +142,7 @@ void FreeRdpClient::run() {
 
     if (!freerdp_connect(freeRdpInstance)) {
         qDebug() << "Failed to connect";
+        emit disconnected();
         return;
     }
 

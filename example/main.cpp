@@ -23,6 +23,8 @@ int main(int argc, char *argv[]) {
     w.connectToHost(host, port);
     w.show();
 
+    QObject::connect(&w, SIGNAL(disconnected()), &a, SLOT(quit()));
+
     return a.exec();
 }
 

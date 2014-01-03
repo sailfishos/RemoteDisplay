@@ -57,7 +57,9 @@ void RemoteDisplayWidgetPrivate::onConnected() {
 }
 
 void RemoteDisplayWidgetPrivate::onDisconnected() {
+    Q_Q(RemoteDisplayWidget);
     qDebug() << "ON DISCONNECTED";
+    emit q->disconnected();
 }
 
 void RemoteDisplayWidgetPrivate::onCursorChanged(const QCursor &cursor) {
