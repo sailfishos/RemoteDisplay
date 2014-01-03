@@ -10,7 +10,6 @@
 class RemoteDisplayWidget;
 class QThread;
 class FreeRdpClient;
-class Cursor;
 class RemoteScreenBuffer;
 class ScaledScreenBuffer;
 class LetterboxedScreenBuffer;
@@ -39,7 +38,7 @@ private slots:
     void onAboutToConnect();
     void onConnected();
     void onDisconnected();
-    void onCursorChanged(const Cursor &cursor);
+    void onCursorChanged(const QCursor &cursor);
 };
 
 #endif // REMOTEDISPLAYWIDGET_P_H

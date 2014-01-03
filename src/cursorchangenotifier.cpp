@@ -6,13 +6,26 @@
 #include <QImage>
 #include <QPixmap>
 #include <QBitmap>
-#include <QDebug>
+#include <QMetaType>
+#include <QMap>
+#include <QMutex>
 
 namespace {
 
+struct CursorData {
+    CursorData(const QImage &image, const QImage &mask, int hotX, int hotY)
+        : image(image), mask(mask), hotX(hotX), hotY(hotY) {
+    }
+
+    QImage image;
+    QImage mask;
+    int hotX;
+    int hotY;
+};
+
 struct MyPointer {
     rdpPointer pointer;
-    Cursor *myCursor;
+    int index;
 };
 
 MyPointer* getMyPointer(rdpPointer* pointer) {
@@ -21,27 +34,26 @@ MyPointer* getMyPointer(rdpPointer* pointer) {
 
 }
 
-Cursor::Cursor() : hotX(0), hotY(0){
-}
+class CursorChangeNotifierPrivate {
+public:
+    CursorChangeNotifierPrivate() : cursorDataIndex(0) {
+    }
 
-Cursor::Cursor(const QImage &image, const QImage &mask, int hotX, int hotY)
-    : image(image), mask(mask), hotX(hotX), hotY(hotY) {
-}
-
-Cursor::operator QCursor() const {
-    auto imgPixmap = QPixmap::fromImage(image);
-    auto maskBitmap = QBitmap::fromImage(mask);
-    imgPixmap.setMask(maskBitmap);
-    return QCursor(imgPixmap, hotX, hotY);
-}
-
+    QMap<int,CursorData*> cursorDataMap;
+    int cursorDataIndex;
+    QMutex mutex;
+};
 
 CursorChangeNotifier::CursorChangeNotifier(QObject *parent)
-    : QObject(parent) {
-    qRegisterMetaType<Cursor>();
+    : QObject(parent), d_ptr(new CursorChangeNotifierPrivate) {
+}
+
+CursorChangeNotifier::~CursorChangeNotifier() {
+    delete d_ptr;
 }
 
 void CursorChangeNotifier::addPointer(rdpPointer* pointer) {
+    Q_D(CursorChangeNotifier);
     int w = pointer->width;
     int h = pointer->height;
 
@@ -60,18 +72,37 @@ void CursorChangeNotifier::addPointer(rdpPointer* pointer) {
     }
     delete data;
 
-    auto myPointer = getMyPointer(pointer);
-    myPointer->myCursor = new Cursor(image, mask, pointer->xPos, pointer->yPos);
+    QMutexLocker(&d->mutex);
+    d->cursorDataMap[d->cursorDataIndex] = new CursorData(image, mask, pointer->xPos, pointer->yPos);
+    getMyPointer(pointer)->index = d->cursorDataIndex;
+    d->cursorDataIndex++;
 }
 
 void CursorChangeNotifier::removePointer(rdpPointer* pointer) {
-    Q_UNUSED(pointer);
-    delete getMyPointer(pointer)->myCursor;
+    Q_D(CursorChangeNotifier);
+    QMutexLocker(&d->mutex);
+    delete d->cursorDataMap.take(getMyPointer(pointer)->index);
 }
 
 void CursorChangeNotifier::changePointer(rdpPointer* pointer) {
-    auto myPointer = getMyPointer(pointer);
-    emit cursorChanged(*myPointer->myCursor);
+    Q_D(CursorChangeNotifier);
+    // pass the changed pointer index from RDP thread to GUI thread because
+    // instances of QCursor should not created outside of GUI thread
+    int index = getMyPointer(pointer)->index;
+    QMetaObject::invokeMethod(this, "onPointerChanged", Q_ARG(int, index));
+}
+
+void CursorChangeNotifier::onPointerChanged(int index) {
+    Q_D(CursorChangeNotifier);
+    QMutexLocker(&d->mutex);
+    if (d->cursorDataMap.contains(index)) {
+        auto data = d->cursorDataMap[index];
+        auto imgPixmap = QPixmap::fromImage(data->image);
+        auto maskBitmap = QBitmap::fromImage(data->mask);
+        imgPixmap.setMask(maskBitmap);
+
+        emit cursorChanged(QCursor(imgPixmap, data->hotX, data->hotY));
+    }
 }
 
 int CursorChangeNotifier::getPointerStructSize() const {

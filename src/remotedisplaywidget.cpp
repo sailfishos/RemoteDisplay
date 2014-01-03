@@ -60,7 +60,7 @@ void RemoteDisplayWidgetPrivate::onDisconnected() {
     qDebug() << "ON DISCONNECTED";
 }
 
-void RemoteDisplayWidgetPrivate::onCursorChanged(const Cursor &cursor) {
+void RemoteDisplayWidgetPrivate::onCursorChanged(const QCursor &cursor) {
     Q_Q(RemoteDisplayWidget);
     q->setCursor(cursor);
 }
@@ -77,7 +77,7 @@ RemoteDisplayWidget::RemoteDisplayWidget(QWidget *parent)
     setMouseTracking(true);
 
     auto cursorNotifier = new CursorChangeNotifier(this);
-    connect(cursorNotifier, SIGNAL(cursorChanged(Cursor)), d, SLOT(onCursorChanged(Cursor)));
+    connect(cursorNotifier, SIGNAL(cursorChanged(QCursor)), d, SLOT(onCursorChanged(QCursor)));
 
     d->eventProcessor = new FreeRdpClient(cursorNotifier);
     d->eventProcessor->moveToThread(d->processorThread);

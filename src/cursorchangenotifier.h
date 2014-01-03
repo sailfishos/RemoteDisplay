@@ -2,26 +2,10 @@
 #define CURSORCHANGENOTIFIER_H
 
 #include <QObject>
-#include <QImage>
-#include <QMetaType>
-
 #include "pointerchangesink.h"
 
 class QCursor;
-
-class Cursor {
-public:
-    Cursor();
-    Cursor(const QImage &image, const QImage &mask, int hotX, int hotY);
-    operator QCursor() const;
-
-private:
-    QImage image;
-    QImage mask;
-    int hotX;
-    int hotY;
-};
-Q_DECLARE_METATYPE(Cursor)
+class CursorChangeNotifierPrivate;
 
 /**
  * The CursorChangeNotifier class notifies when mouse cursor's style should
@@ -35,6 +19,7 @@ class CursorChangeNotifier : public QObject, public PointerChangeSink {
     Q_OBJECT
 public:
     CursorChangeNotifier(QObject *parent = 0);
+    ~CursorChangeNotifier();
 
     /**
      * Implemented from PointerChangeSink.
@@ -60,7 +45,14 @@ signals:
     /**
      * This signal is emitted when current mouse cursor style changes.
      */
-    void cursorChanged(const Cursor &cursor);
+    void cursorChanged(const QCursor &cursor);
+
+private slots:
+    void onPointerChanged(int index);
+
+private:
+    Q_DECLARE_PRIVATE(CursorChangeNotifier)
+    CursorChangeNotifierPrivate* const d_ptr;
 };
 
 #endif // CURSORCHANGENOTIFIER_H
