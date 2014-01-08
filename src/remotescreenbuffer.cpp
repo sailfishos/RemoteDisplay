@@ -57,6 +57,12 @@ QImage RemoteScreenBuffer::createImage() const {
 
 void RemoteScreenBuffer::addRectangle(const QRect &rect, const QByteArray &data) {
     Q_D(RemoteScreenBuffer);
+    // hack: ignore 1 pixel height rectangles as decompressing of those
+    // sometimes cause a heap corruption, reason unknown
+    if (rect.height() == 1) {
+        return;
+    }
+
     // decompress update's image data to 'imgData'
     QByteArray imgData;
     imgData.resize(rect.width() * rect.height() * (d->bpp / 8));
