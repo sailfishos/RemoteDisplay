@@ -8,6 +8,9 @@
 #include <freerdp/input.h>
 #include <freerdp/utils/tcp.h>
 #include <freerdp/cache/pointer.h>
+#ifdef Q_OS_UNIX
+#include <freerdp/locale/keyboard.h>
+#endif
 
 #include <QDebug>
 #include <QPainter>
@@ -47,6 +50,11 @@ BOOL FreeRdpClient::PostConnectCallback(freerdp* instance) {
     pointer.SetDefault = NULL;
     graphics_register_pointer(context->freeRdpContext.graphics, &pointer);
 
+#ifdef Q_OS_UNIX
+    // needed for freerdp_keyboard_get_rdp_scancode_from_x11_keycode() to work
+    freerdp_keyboard_init(settings->KeyboardLayout);
+#endif
+
     emit self->connected();
 
     return TRUE;
@@ -77,6 +85,7 @@ void FreeRdpClient::BitmapUpdateCallback(rdpContext *context, BITMAP_UPDATE *upd
             auto u = &updates->rectangles[i];
             QRect rect(u->destLeft, u->destTop, u->width, u->height);
             QByteArray data((char*)u->bitmapDataStream, u->bitmapLength);
+            Q_ASSERT(u->bitsPerPixel == 16);
             sink->addRectangle(rect, data);
         }
         emit self->desktopUpdated();
@@ -131,6 +140,10 @@ void FreeRdpClient::sendKeyEvent(QKeyEvent *event) {
     bool down = event->type() == QEvent::KeyPress;
     auto code = event->nativeScanCode();
     auto input = freeRdpInstance->input;
+
+#ifdef Q_OS_UNIX
+    code = freerdp_keyboard_get_rdp_scancode_from_x11_keycode(code);
+#endif
 
     if (input) {
         freerdp_input_send_keyboard_event_ex(input, down, code);
