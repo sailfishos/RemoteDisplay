@@ -11,6 +11,7 @@
 
 #include <QDebug>
 #include <QPainter>
+#include <QKeyEvent>
 
 namespace {
 
@@ -120,6 +121,20 @@ void FreeRdpClient::sendMouseReleaseEvent(Qt::MouseButton button, const QPoint &
         return;
     }
     sendMouseEvent(rdpButton, pos);
+}
+
+void FreeRdpClient::sendKeyEvent(QKeyEvent *event) {
+    if (event->isAutoRepeat()) {
+        return;
+    }
+
+    bool down = event->type() == QEvent::KeyPress;
+    auto code = event->nativeScanCode();
+    auto input = freeRdpInstance->input;
+
+    if (input) {
+        freerdp_input_send_keyboard_event_ex(input, down, code);
+    }
 }
 
 void FreeRdpClient::setBitmapRectangleSink(BitmapRectangleSink *sink) {

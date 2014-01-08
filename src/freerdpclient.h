@@ -24,6 +24,7 @@ public:
     void sendMouseMoveEvent(const QPoint &pos);
     void sendMousePressEvent(Qt::MouseButton button, const QPoint &pos);
     void sendMouseReleaseEvent(Qt::MouseButton button, const QPoint &pos);
+    void sendKeyEvent(QKeyEvent *event);
 
 public slots:
     void setSettingServerHostName(const QString &host);

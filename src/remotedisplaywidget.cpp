@@ -156,6 +156,18 @@ void RemoteDisplayWidget::mouseReleaseEvent(QMouseEvent *event) {
         d->mapToRemoteDesktop(event->pos()));
 }
 
+void RemoteDisplayWidget::keyPressEvent(QKeyEvent *event) {
+    Q_D(RemoteDisplayWidget);
+    d->eventProcessor->sendKeyEvent(event);
+    event->accept();
+}
+
+void RemoteDisplayWidget::keyReleaseEvent(QKeyEvent *event) {
+    Q_D(RemoteDisplayWidget);
+    d->eventProcessor->sendKeyEvent(event);
+    event->accept();
+}
+
 void RemoteDisplayWidget::resizeEvent(QResizeEvent *event) {
     Q_D(RemoteDisplayWidget);
     d->resizeScreenBuffers();
