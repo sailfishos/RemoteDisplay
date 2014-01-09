@@ -11,9 +11,12 @@
 #include <QPointer>
 #include <QPaintEvent>
 #include <QPainter>
+#include <QTimer>
+
+#define FRAMERATE_LIMIT 40
 
 RemoteDisplayWidgetPrivate::RemoteDisplayWidgetPrivate(RemoteDisplayWidget *q)
-    : q_ptr(q) {
+    : q_ptr(q), repaintNeeded(false) {
     processorThread = new QThread(q);
     processorThread->start();
 }
@@ -67,6 +70,18 @@ void RemoteDisplayWidgetPrivate::onCursorChanged(const QCursor &cursor) {
     q->setCursor(cursor);
 }
 
+void RemoteDisplayWidgetPrivate::onDesktopUpdated() {
+    repaintNeeded = true;
+}
+
+void RemoteDisplayWidgetPrivate::onRepaintTimeout() {
+    Q_Q(RemoteDisplayWidget);
+    if (repaintNeeded) {
+        repaintNeeded = false;
+        q->repaint();
+    }
+}
+
 typedef RemoteDisplayWidgetPrivate Pimpl;
 
 RemoteDisplayWidget::RemoteDisplayWidget(QWidget *parent)
@@ -87,7 +102,13 @@ RemoteDisplayWidget::RemoteDisplayWidget(QWidget *parent)
     connect(d->eventProcessor, SIGNAL(aboutToConnect()), d, SLOT(onAboutToConnect()));
     connect(d->eventProcessor, SIGNAL(connected()), d, SLOT(onConnected()));
     connect(d->eventProcessor, SIGNAL(disconnected()), d, SLOT(onDisconnected()));
-    connect(d->eventProcessor, SIGNAL(desktopUpdated()), this, SLOT(update()));
+    connect(d->eventProcessor, SIGNAL(desktopUpdated()), d, SLOT(onDesktopUpdated()));
+
+    auto timer = new QTimer(this);
+    timer->setSingleShot(false);
+    timer->setInterval(1000 / FRAMERATE_LIMIT);
+    connect(timer, SIGNAL(timeout()), d, SLOT(onRepaintTimeout()));
+    timer->start();
 }
 
 RemoteDisplayWidget::~RemoteDisplayWidget() {
