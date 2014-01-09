@@ -4,32 +4,31 @@
 #include <QImage>
 #include <QDebug>
 #include <QPainter>
-
-#include <freerdp/codec/bitmap.h>
+#include <QFile>
 
 class RemoteScreenBufferPrivate {
 public:
     RemoteScreenBufferPrivate(RemoteScreenBuffer *q) : q_ptr(q) {
     }
 
-    void initBuffer() {
+    void initBuffer(int bpp) {
         Q_Q(RemoteScreenBuffer);
-        Q_ASSERT(isSizeAndFormatValid());
-        if (isSizeAndFormatValid()) {
+        Q_ASSERT(isSizeAndFormatValid(bpp));
+        if (isSizeAndFormatValid(bpp)) {
             bufferData.resize(width * height * bpp);
             targetImage = q->createImage();
             targetImage.fill(0);
         }
     }
 
-    bool isSizeAndFormatValid() const {
+    bool isSizeAndFormatValid(int bpp) const {
         return width > 0 && height > 0 && bppToImageFormat(bpp) != QImage::Format_Invalid;
     }
 
     QByteArray bufferData;
     quint16 width;
     quint16 height;
-    quint8 bpp;
+    QImage::Format format;
     QImage targetImage;
 
 private:
@@ -42,8 +41,8 @@ RemoteScreenBuffer::RemoteScreenBuffer(quint16 width, quint16 height, quint8 bpp
     Q_D(RemoteScreenBuffer);
     d->width = width;
     d->height = height;
-    d->bpp = bpp;
-    d->initBuffer();
+    d->format = bppToImageFormat(bpp);
+    d->initBuffer(bpp);
 }
 
 RemoteScreenBuffer::~RemoteScreenBuffer() {
@@ -52,27 +51,13 @@ RemoteScreenBuffer::~RemoteScreenBuffer() {
 
 QImage RemoteScreenBuffer::createImage() const {
     Q_D(const RemoteScreenBuffer);
-    return QImage((uchar*)d->bufferData.data(), d->width, d->height, bppToImageFormat(d->bpp));
+    return QImage((uchar*)d->bufferData.data(), d->width, d->height, d->format);
 }
 
 void RemoteScreenBuffer::addRectangle(const QRect &rect, const QByteArray &data) {
     Q_D(RemoteScreenBuffer);
-    // hack: ignore 1 pixel height rectangles as decompressing of those
-    // sometimes cause a heap corruption, reason unknown
-    if (rect.height() == 1) {
-        return;
-    }
-
-    // decompress update's image data to 'imgData'
-    QByteArray imgData;
-    imgData.resize(rect.width() * rect.height() * (d->bpp / 8));
-    if (!bitmap_decompress((BYTE*)data.data(), (BYTE*)imgData.data(), rect.width(), rect.height(), data.size(), d->bpp, d->bpp)) {
-        qWarning() << "Bitmap update decompression failed";
-    }
-
-    QImage rectImg((uchar*)imgData.data(), rect.width(), rect.height(), bppToImageFormat(d->bpp));
+    QImage rectImg((uchar*)data.data(), rect.width(), rect.height(), d->format);
 
     QPainter painter(&d->targetImage);
     painter.drawImage(rect, rectImg);
 }
-

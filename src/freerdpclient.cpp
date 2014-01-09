@@ -8,6 +8,7 @@
 #include <freerdp/input.h>
 #include <freerdp/utils/tcp.h>
 #include <freerdp/cache/pointer.h>
+#include <freerdp/codec/bitmap.h>
 #ifdef Q_OS_UNIX
 #include <freerdp/locale/keyboard.h>
 #endif
@@ -84,8 +85,18 @@ void FreeRdpClient::BitmapUpdateCallback(rdpContext *context, BITMAP_UPDATE *upd
         for (quint32 i = 0; i < updates->number; i++) {
             auto u = &updates->rectangles[i];
             QRect rect(u->destLeft, u->destTop, u->width, u->height);
-            QByteArray data((char*)u->bitmapDataStream, u->bitmapLength);
+            QByteArray data;
             Q_ASSERT(u->bitsPerPixel == 16);
+
+            if (u->compressed) {
+                data.resize(u->width * u->height * (u->bitsPerPixel / 8));
+                if (!bitmap_decompress(u->bitmapDataStream, (BYTE*)data.data(), u->width, u->height, u->bitmapLength, u->bitsPerPixel, u->bitsPerPixel)) {
+                    qWarning() << "Bitmap update decompression failed";
+                }
+            } else {
+                data = QByteArray((char*)u->bitmapDataStream, u->bitmapLength);
+            }
+
             sink->addRectangle(rect, data);
         }
         emit self->desktopUpdated();
