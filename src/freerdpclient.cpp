@@ -8,6 +8,8 @@
 #include <freerdp/input.h>
 #include <freerdp/utils/tcp.h>
 #include <freerdp/cache/pointer.h>
+#include <freerdp/client/channels.h>
+#include <freerdp/client/cmdline.h>
 #include <freerdp/codec/bitmap.h>
 #ifdef Q_OS_UNIX
 #include <freerdp/locale/keyboard.h>
@@ -16,6 +18,9 @@
 #include <QDebug>
 #include <QPainter>
 #include <QKeyEvent>
+#include <QByteArray>
+
+int FreeRdpClient::instanceCount = 0;
 
 namespace {
 
@@ -31,6 +36,7 @@ UINT16 qtMouseButtonToRdpButton(Qt::MouseButton button) {
 }
 
 BOOL FreeRdpClient::PreConnectCallback(freerdp* instance) {
+    freerdp_channels_pre_connect(instance->context->channels, instance);
     emit getMyContext(instance)->self->aboutToConnect();
     return TRUE;
 }
@@ -56,6 +62,8 @@ BOOL FreeRdpClient::PostConnectCallback(freerdp* instance) {
     freerdp_keyboard_init(settings->KeyboardLayout);
 #endif
 
+    freerdp_channels_post_connect(instance->context->channels, instance);
+
     emit self->connected();
 
     return TRUE;
@@ -63,6 +71,11 @@ BOOL FreeRdpClient::PostConnectCallback(freerdp* instance) {
 
 void FreeRdpClient::PostDisconnectCallback(freerdp* instance) {
     emit getMyContext(instance)->self->disconnected();
+}
+
+int FreeRdpClient::ReceiveChannelDataCallback(freerdp *instance, int channelId,
+    BYTE *data, int size, int flags, int total_size) {
+    return freerdp_channels_data(instance, channelId, data, size, flags, total_size);
 }
 
 void FreeRdpClient::PointerNewCallback(rdpContext *context, rdpPointer *pointer) {
@@ -106,17 +119,30 @@ void FreeRdpClient::BitmapUpdateCallback(rdpContext *context, BITMAP_UPDATE *upd
 FreeRdpClient::FreeRdpClient(PointerChangeSink *pointerSink)
     : freeRdpInstance(nullptr), bitmapRectangleSink(nullptr),
       pointerChangeSink(pointerSink) {
-    freerdp_wsa_startup();
+
+    if (instanceCount == 0) {
+        freerdp_channels_global_init();
+        freerdp_register_addin_provider(freerdp_channels_load_static_addin_entry, 0);
+        freerdp_wsa_startup();
+    }
+    instanceCount++;
+
     loop = new FreeRdpEventLoop(this);
 }
 
 FreeRdpClient::~FreeRdpClient() {
     if (freeRdpInstance) {
+        freerdp_channels_free(freeRdpInstance->context->channels);
         freerdp_context_free(freeRdpInstance);
         freerdp_free(freeRdpInstance);
         freeRdpInstance = nullptr;
     }
-    freerdp_wsa_cleanup();
+
+    instanceCount--;
+    if (instanceCount == 0) {
+        freerdp_channels_global_uninit();
+        freerdp_wsa_cleanup();
+    }
 }
 
 void FreeRdpClient::requestStop() {
@@ -187,6 +213,7 @@ void FreeRdpClient::run() {
 
     loop->exec(freeRdpInstance);
 
+    freerdp_channels_close(context->channels, freeRdpInstance);
     freerdp_disconnect(freeRdpInstance);
 
     if (context->cache) {
@@ -207,8 +234,7 @@ void FreeRdpClient::initFreeRDP() {
     freeRdpInstance->VerifyCertificate = nullptr;
     freeRdpInstance->VerifyChangedCertificate = nullptr;
     freeRdpInstance->LogonErrorInfo = nullptr;
-    freeRdpInstance->SendChannelData = nullptr;
-    freeRdpInstance->ReceiveChannelData = nullptr;
+    freeRdpInstance->ReceiveChannelData = ReceiveChannelDataCallback;
     freeRdpInstance->PreConnect = PreConnectCallback;
     freeRdpInstance->PostConnect = PostConnectCallback;
     freeRdpInstance->PostDisconnect = PostDisconnectCallback;
@@ -221,6 +247,11 @@ void FreeRdpClient::initFreeRDP() {
 
     auto settings = freeRdpInstance->context->settings;
     settings->EmbeddedWindow = TRUE;
+
+    // add sound support
+    freeRdpInstance->context->channels = freerdp_channels_new();
+    addStaticChannel(QStringList() << "rdpsnd");
+    freerdp_client_load_addins(freeRdpInstance->context->channels, settings);
 }
 
 void FreeRdpClient::sendMouseEvent(UINT16 flags, const QPoint &pos) {
@@ -232,6 +263,21 @@ void FreeRdpClient::sendMouseEvent(UINT16 flags, const QPoint &pos) {
             input->MouseEvent(input, flags, pos.x(), pos.y());
         }
     }
+}
+
+void FreeRdpClient::addStaticChannel(const QStringList &args) {
+    auto argsArray = new char*[args.size()];
+    QList<char*> delList;
+
+    for (int i = 0; i < args.size(); i++) {
+        auto d = args[i].toLocal8Bit();
+        delList << (argsArray[i] = _strdup(d.data()));
+    }
+
+    freerdp_client_add_static_channel(freeRdpInstance->settings, args.size(), argsArray);
+
+    qDeleteAll(delList);
+    delete[] argsArray;
 }
 
 void FreeRdpClient::setSettingServerHostName(const QString &host) {

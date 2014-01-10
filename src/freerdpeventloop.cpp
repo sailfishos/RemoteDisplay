@@ -1,4 +1,5 @@
 #include "freerdpeventloop.h"
+#include <freerdp/channels/channels.h>
 #include <QCoreApplication>
 
 FreeRdpEventLoop::FreeRdpEventLoop(QObject *parent) :
@@ -30,8 +31,15 @@ bool FreeRdpEventLoop::handleFds() {
     memset(rfds, 0, sizeof(rfds));
     memset(wfds, 0, sizeof(wfds));
 
+    auto channels = freeRdpInstance->context->channels;
+
     if (!freerdp_get_fds(freeRdpInstance, rfds, &rcount, wfds, &wcount)) {
         fprintf(stderr, "Failed to get FreeRDP file descriptor\n");
+        return false;
+    }
+
+    if (!freerdp_channels_get_fds(channels, freeRdpInstance, rfds, &rcount, wfds, &wcount)) {
+        fprintf(stderr, "Failed to get channel manager file descriptor\n");
         return false;
     }
 
@@ -41,6 +49,11 @@ bool FreeRdpEventLoop::handleFds() {
 
     if (!freerdp_check_fds(freeRdpInstance)) {
         fprintf(stderr, "Failed to check FreeRDP file descriptor\n");
+        return false;
+    }
+
+    if (!freerdp_channels_check_fds(channels, freeRdpInstance)) {
+        fprintf(stderr, "Failed to check channel manager file descriptor\n");
         return false;
     }
 

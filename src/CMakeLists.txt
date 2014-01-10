@@ -27,4 +27,10 @@ list(APPEND SRC_LIST
 
 add_library(${PROJECT_NAME} SHARED ${SRC_LIST})
 set_property(TARGET ${PROJECT_NAME} PROPERTY COMPILE_DEFINITIONS REMOTEDISPLAY_LIBRARY)
-target_link_libraries(${PROJECT_NAME} ${QT_LIBRARIES} freerdp-core freerdp-codec freerdp-cache)
+target_link_libraries(${PROJECT_NAME}
+    ${QT_LIBRARIES}
+    freerdp-client
+    freerdp-core
+    freerdp-codec
+    freerdp-cache
+)

@@ -43,11 +43,14 @@ signals:
 private:
     void initFreeRDP();
     void sendMouseEvent(UINT16 flags, const QPoint &pos);
+    void addStaticChannel(const QStringList& args);
 
     static void BitmapUpdateCallback(rdpContext *context, BITMAP_UPDATE *updates);
     static BOOL PreConnectCallback(freerdp* instance);
     static BOOL PostConnectCallback(freerdp* instance);
     static void PostDisconnectCallback(freerdp* instance);
+    static int ReceiveChannelDataCallback(freerdp* instance, int channelId,
+        BYTE* data, int size, int flags, int total_size);
 
     static void PointerNewCallback(rdpContext* context, rdpPointer* pointer);
     static void PointerFreeCallback(rdpContext* context, rdpPointer* pointer);
@@ -57,6 +60,7 @@ private:
     BitmapRectangleSink *bitmapRectangleSink;
     PointerChangeSink *pointerChangeSink;
     QPointer<FreeRdpEventLoop> loop;
+    static int instanceCount;
 };
 
 #endif // FREERDPCLIENT_H
