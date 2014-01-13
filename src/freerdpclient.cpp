@@ -3,6 +3,7 @@
 #include "freerdphelpers.h"
 #include "bitmaprectanglesink.h"
 #include "pointerchangesink.h"
+#include "rdpqtsoundplugin.h"
 
 #include <freerdp/freerdp.h>
 #include <freerdp/input.h>
@@ -31,6 +32,16 @@ UINT16 qtMouseButtonToRdpButton(Qt::MouseButton button) {
         return PTR_FLAGS_BUTTON2;
     }
     return 0;
+}
+
+void* channelAddinLoadHook(LPCSTR pszName, LPSTR pszSubsystem, LPSTR pszType, DWORD dwFlags) {
+    QString name = pszName;
+    QString subSystem = pszSubsystem;
+
+    if (name == "rdpsnd" && subSystem == "qt") {
+        return RdpQtSoundPlugin::create;
+    }
+    return freerdp_channels_load_static_addin_entry(pszName, pszSubsystem, pszType, dwFlags);
 }
 
 }
@@ -122,7 +133,7 @@ FreeRdpClient::FreeRdpClient(PointerChangeSink *pointerSink)
 
     if (instanceCount == 0) {
         freerdp_channels_global_init();
-        freerdp_register_addin_provider(freerdp_channels_load_static_addin_entry, 0);
+        freerdp_register_addin_provider(channelAddinLoadHook, 0);
         freerdp_wsa_startup();
     }
     instanceCount++;
@@ -250,7 +261,7 @@ void FreeRdpClient::initFreeRDP() {
 
     // add sound support
     freeRdpInstance->context->channels = freerdp_channels_new();
-    addStaticChannel(QStringList() << "rdpsnd");
+    addStaticChannel(QStringList() << "rdpsnd" << "sys:qt");
     freerdp_client_load_addins(freeRdpInstance->context->channels, settings);
 }
 

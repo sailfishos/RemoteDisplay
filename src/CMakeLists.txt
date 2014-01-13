@@ -8,7 +8,7 @@ if(CMAKE_COMPILER_IS_GNUCXX)
 endif(CMAKE_COMPILER_IS_GNUCXX)
 
 set(CMAKE_AUTOMOC TRUE)
-find_package(Qt4 REQUIRED QtCore QtGui)
+find_package(Qt4 REQUIRED QtCore QtGui QtMultimedia)
 find_package(WinPR)
 find_package(FreeRDP)
 
