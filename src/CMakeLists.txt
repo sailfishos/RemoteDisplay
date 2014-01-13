@@ -8,12 +8,17 @@ if(CMAKE_COMPILER_IS_GNUCXX)
 endif(CMAKE_COMPILER_IS_GNUCXX)
 
 set(CMAKE_AUTOMOC TRUE)
-find_package(Qt4 REQUIRED QtCore QtGui QtMultimedia)
+find_package(Qt4 OPTIONAL_COMPONENTS QtCore QtGui QtMultimedia)
 find_package(WinPR)
 find_package(FreeRDP)
 
+if(QT_QTMULTIMEDIA_FOUND)
+    set(WITH_QTSOUND 1)
+endif(QT_QTMULTIMEDIA_FOUND)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
+
 include(${QT_USE_FILE})
-include_directories(${FreeRDP_INCLUDE_DIR} ${WinPR_INCLUDE_DIR})
+include_directories(${FreeRDP_INCLUDE_DIR} ${WinPR_INCLUDE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 
 aux_source_directory(. SRC_LIST)
 list(APPEND SRC_LIST

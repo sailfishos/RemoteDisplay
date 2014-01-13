@@ -1,4 +1,6 @@
 #include "rdpqtsoundplugin.h"
+#include "config.h"
+#ifdef WITH_QTSOUND
 #include <QAudioOutput>
 #include <QAudioFormat>
 #include <QDebug>
@@ -101,3 +103,8 @@ RdpQtSoundPlugin::RdpQtSoundPlugin() {
 RdpQtSoundPlugin::~RdpQtSoundPlugin() {
     delete audioOut;
 }
+#else
+int RdpQtSoundPlugin::create(PFREERDP_RDPSND_DEVICE_ENTRY_POINTS pEntryPoints) {
+    return 0;
+}
+#endif

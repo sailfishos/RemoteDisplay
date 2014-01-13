@@ -1,4 +1,5 @@
 #include "freerdpclient.h"
+#include "config.h"
 #include "freerdpeventloop.h"
 #include "freerdphelpers.h"
 #include "bitmaprectanglesink.h"
@@ -39,7 +40,7 @@ void* channelAddinLoadHook(LPCSTR pszName, LPSTR pszSubsystem, LPSTR pszType, DW
     QString subSystem = pszSubsystem;
 
     if (name == "rdpsnd" && subSystem == "qt") {
-        return RdpQtSoundPlugin::create;
+        return (void*)RdpQtSoundPlugin::create;
     }
     return freerdp_channels_load_static_addin_entry(pszName, pszSubsystem, pszType, dwFlags);
 }
@@ -261,7 +262,13 @@ void FreeRdpClient::initFreeRDP() {
 
     // add sound support
     freeRdpInstance->context->channels = freerdp_channels_new();
+#ifdef WITH_QTSOUND
+    // use Qt Multimedia based audio output
     addStaticChannel(QStringList() << "rdpsnd" << "sys:qt");
+#else
+    // use what FreeRDP provides
+    addStaticChannel(QStringList() << "rdpsnd");
+#endif
     freerdp_client_load_addins(freeRdpInstance->context->channels, settings);
 }
 
