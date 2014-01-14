@@ -58,6 +58,8 @@ refer to [install instructions at cmake's site](http://www.cmake.org/cmake/help/
 To build the FreeRDP, clone its repo first:
 ```
 $ git clone https://github.com/sailfish-sdk/FreeRDP.git
+$ cd FreeRDP
+$ git checkout build-fixes
 ```
 Next, cd to its directory and configure the project with cmake:
 ```
@@ -110,6 +112,8 @@ You can download cmake from [Kitware's CMake download page](http://www.cmake.org
 To build the FreeRDP, clone its repo:
 ```
 $ git clone https://github.com/sailfish-sdk/FreeRDP.git
+$ cd FreeRDP
+$ git checkout build-fixes
 ```
 Next, cd to its directory and configure the project with cmake:
 ```
