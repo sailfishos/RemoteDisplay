@@ -45,3 +45,4 @@ install(TARGETS ${PROJECT_NAME}
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
 )
+install(FILES remotedisplaywidget.h global.h DESTINATION include/RemoteDisplay)
