@@ -9,7 +9,7 @@ int main(int argc, char *argv[]) {
 
     auto args = a.arguments();
     if (args.count() < 5) {
-        qCritical("Usage: Example.exe <host> <port> <width> <height>");
+        qCritical("Usage: RemoteDisplayExample <host> <port> <width> <height>");
         return -1;
     }
 

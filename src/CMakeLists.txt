@@ -39,3 +39,9 @@ target_link_libraries(${PROJECT_NAME}
     freerdp-codec
     freerdp-cache
 )
+
+install(TARGETS ${PROJECT_NAME}
+    RUNTIME DESTINATION bin
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib
+)
