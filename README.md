@@ -44,7 +44,7 @@ for Windows and Linux.
 ### Building in Linux
 Prerequisites:
 * CMake 2.8.10 or newer
-* FreeRDP from https://github.com/sailfish-sdk/FreeRDP, branch 'build-fixes'
+* FreeRDP from https://github.com/sailfishos/FreeRDP, branch 'build-fixes'
 * Qt 4.8 or newer (5.x not yet supported)
 * gcc 4.5 or newer (for some c++11 features)
 * Git
@@ -57,7 +57,7 @@ refer to [install instructions at cmake's site](http://www.cmake.org/cmake/help/
 
 To build the FreeRDP, clone its repo first:
 ```
-$ git clone https://github.com/sailfish-sdk/FreeRDP.git
+$ git clone https://github.com/sailfishos/FreeRDP.git
 $ cd FreeRDP
 $ git checkout build-fixes
 ```
@@ -76,7 +76,7 @@ $ sudo make install
 #### Building RemoteDisplay
 First clone the repo:
 ```
-$ git clone https://github.com/sailfish-sdk/RemoteDisplay.git
+$ git clone https://github.com/sailfishos/RemoteDisplay.git
 ```
 Next, cd to its directory and configure, build and install it:
 ```
@@ -97,7 +97,7 @@ Run RemoteDisplayExample without parameters for explanation what the parameters 
 ### Building in Windows
 Prerequisites:
 * CMake 2.8.10 or newer
-* FreeRDP from https://github.com/sailfish-sdk/FreeRDP, branch 'build-fixes'
+* FreeRDP from https://github.com/sailfishos/FreeRDP, branch 'build-fixes'
 * Qt 4.8 or newer (5.x not yet supported)
 * Visual Studio 2010
 * Git
@@ -111,7 +111,7 @@ You can download cmake from [Kitware's CMake download page](http://www.cmake.org
 
 To build the FreeRDP, clone its repo:
 ```
-$ git clone https://github.com/sailfish-sdk/FreeRDP.git
+$ git clone https://github.com/sailfishos/FreeRDP.git
 $ cd FreeRDP
 $ git checkout build-fixes
 ```
@@ -131,7 +131,7 @@ $ nmake install
 #### Building RemoteDisplay
 First clone the repo:
 ```
-$ git clone https://github.com/sailfish-sdk/RemoteDisplay.git
+$ git clone https://github.com/sailfishos/RemoteDisplay.git
 ```
 Next, cd to its directory and configure, build and install it:
 ```
